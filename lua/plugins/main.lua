@@ -1,10 +1,9 @@
-return {
+local mainConf={
     -- color scheme
     {
         "EdenEast/nightfox.nvim",
     },
-
-    -- 加载color scheme
+    -- load color scheme
     {
         "LazyVim/LazyVim",
         opts = {
@@ -15,7 +14,7 @@ return {
     {
         "rcarriga/nvim-notify",
         opts = {
-            timeout = 10000
+            timeout = 5000
         }
     },
     -- treesitter
@@ -99,6 +98,100 @@ return {
     {
         'kaarmu/typst.vim',
         ft = 'typst',
-        lazy=false,
+    },
+    {
+        'chomosuke/typst-preview.nvim',
+        ft= 'typst',
+        version= '0.1.*',
+        build = function() require 'typst-preview'.update() end,
     },
 }
+
+local vscodeConf={
+    -- load color scheme
+    {
+        "LazyVim/LazyVim",
+        opts = {
+            colorscheme = "default",
+        },
+    },
+    -- show the notice for longer time
+    {
+        "rcarriga/nvim-notify",
+        opts = {
+            timeout = 5000
+        }
+    },
+    -- treesitter
+    {
+        "nvim-treesitter/nvim-treesitter",
+        opts = {
+            ensure_installed = {
+                "lua",
+                "markdown",
+                "markdown_inline",
+                "python",
+                "javascript",
+                "typescript",
+                "julia",
+                "scala",
+                "cpp",
+                "rust"
+            },
+        },
+    },
+    -- mason-lspconfig
+    {
+        "williamboman/mason.nvim",
+        lazy=false,
+        opts = {
+            ensure_installed = {
+                "stylua",
+                "shfmt",
+                "flake8",
+                "clangd",
+                "clang-format",
+                "julia-lsp",
+                "rust-analyzer",
+                "prosemd-lsp",
+                "typst-lsp",
+            }
+        }
+    },
+    -- luasnips setting
+    {
+        "L3MON4D3/LuaSnip",
+        enabled = false
+    },
+    -- disable friendly-snippets
+    { "rafamadriz/friendly-snippets", enabled = false },
+    -- mini.pairs
+    {
+        "echasnovski/mini.pairs",
+        opts={
+            mappings = {
+                ['('] = { action = 'open', pair = '()', neigh_pattern = '[^\\].' },
+                ['['] = { action = 'open', pair = '[]', neigh_pattern = '[^\\].' },
+                ['{'] = { action = 'open', pair = '{}', neigh_pattern = '[^\\].' },
+            
+                [')'] = { action = 'close', pair = '()', neigh_pattern = '[^\\].' },
+                [']'] = { action = 'close', pair = '[]', neigh_pattern = '[^\\].' },
+                ['}'] = { action = 'close', pair = '{}', neigh_pattern = '[^\\].' },
+            
+                ['"'] = { action = 'closeopen', pair = '""', neigh_pattern = '[^\\].', register = { cr = false } },
+                ["'"] = { action = 'closeopen', pair = "''", neigh_pattern = '%s.', register = { cr = false } },
+                ['`'] = { action = 'closeopen', pair = '``', neigh_pattern = '[^\\].', register = { cr = false } },
+                },
+        }
+    },
+    {
+        'kaarmu/typst.vim',
+        ft = 'typst',
+    },
+}
+
+if vim.g.vscode then
+    return vscodeConf
+else
+    return mainConf
+end

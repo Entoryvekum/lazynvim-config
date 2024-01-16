@@ -508,7 +508,7 @@ Fraction()
 --二项式系数
 local function Binomial()
     snip(
-        s({ trig = "bin", hidden = true }, { t("binom ( "), i(1), t(" ) ") }, { condition = mathZone })
+        s({ trig = "bin", hidden = true }, { t("binom( "), i(1), t(" ) ") }, { condition = mathZone })
     )
 
     snip(
