@@ -104,26 +104,41 @@ end
 local function MathEnvironment()
     --数学环境
     asnip(
-        s({ trig = ";'", wordTrig = false }, { t("$"), i(1), t(" $") }, { condition = plainText })
+        s({ trig = ";;", wordTrig = false }, { t("$"), i(1), t(" $") }, { condition = plainText })
     )
     asnip(
-        s({ trig = ";;;", wordTrig = false }, { t("$  "), i(1), t("  $") }, { condition = plainText })
+        s({ trig = ";'", wordTrig = false }, { t("$  "), i(1), t("  $") }, { condition = plainText })
     )
     snip(
-        s({ trig = "note" },{
+        s({ trig = "NoteTemplate" },{
             t{"#import(\"@local/NoteTemplate:0.1.0\"):*","",""},
             t{"#Note(",""},
             t("    headline:\""),i(1),t{"\",",""},
             t("    title:\""),i(2),t{"\",",""},
             t("    author:\""),i(3,"Entoryverkum"),t{"\",",""},
             t("    email:\""),i(4,"entoryvekum@outlook.com"),t{"\",",""},
-            t("    time:datetime(year: "),i(5,"2023"),t(", month: "),i(6,"10"),t(", day: "),i(7,"1"),t(")"),t{",",""},
+            t("    time:\""),i(5,"2020"),t{"\",",""},
             t("    pagebreakBeforeOutline:false"),t{",",""},
-            t(")["),
-            i(1),
-            t("]")
+            t(")["),i(6),t("]")
         })
     )
+    snip(
+        s({ trig = "template" },{
+            t("#import(\"@local/"),i(1),t(":0.1.0\"):*")
+        })
+    )
+    local alpha={"thrm","def","lemma","corol","example","caution","prop","idea"}
+    for k, v in ipairs(alpha) do
+        snip(
+            s({trig="#"..v},{
+                t("#"..v.."( name: ["),
+                i(1),
+                t("] )["),
+                i(2),
+                t("]")
+            })
+        )
+    end
 end
 MathEnvironment()
 
@@ -141,6 +156,7 @@ local function Symbols()
         { "lap", "∆"},
         { "nab", "∇"},
         { "par","∂"},
+        { "|m","mid(|)","a"}
     }
     addSimpleSnip(alpha, "n", false)
 end

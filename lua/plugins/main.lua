@@ -101,10 +101,27 @@ local mainConf={
     },
     {
         'chomosuke/typst-preview.nvim',
-        ft= 'typst',
+        ft = 'typst',
         version= '0.1.*',
         build = function() require 'typst-preview'.update() end,
     },
+    {
+        'dfendr/clipboard-image.nvim',
+        opts={
+            typst={
+                img_dir = {"%:p:h", "img", "clipboard"},
+                img_dir_txt = {"img", "clipboard"},
+                img_name = function() return os.date('%Y-%m-%d-%H-%M-%S') end,
+                affix = "#image(\"%s\")"
+            },
+            markdown={
+                img_dir = {"%:p:h", "img", "clipboard"},
+                img_dir_txt = {"img", "clipboard"},
+                img_name = function() return os.date('%Y-%m-%d-%H-%M-%S') end,
+                affix = "![](%s)"
+            },
+        }
+    }
 }
 
 local vscodeConf={

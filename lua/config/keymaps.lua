@@ -61,3 +61,13 @@ map(
         silent = true,
     }
 )
+map(
+    {"n"},
+    "<leader>typ", "<cmd>TypstPreview<cr>",
+    {desc = "Preview Typst document"}
+)
+map(
+    {"n"},
+    "<leader>pp", "<cmd>PasteImg<cr>",
+    {desc = "Paste imgage in the clipboard"}
+)
