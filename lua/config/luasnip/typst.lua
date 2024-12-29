@@ -97,8 +97,13 @@ local function addSimpleSnip(alpha, defaultType, hide, con)
 end
 
 -- --------------------------------测试--------------------------------
+<<<<<<< HEAD
 -- local test1 = s("t@hello", { t("hello world!") })
 -- snip(test1)
+=======
+local test1 = s("sniptest:hello", { t("hello world!") })
+snip(test1)
+>>>>>>> 80d7e6a (remove vscode settings, move from typst.vim to tinymist, optimize snippet)
 
 --------------------------------环境--------------------------------
 local function MathEnvironment()
@@ -124,7 +129,11 @@ local function MathEnvironment()
     )
     snip(
         s({ trig = "template" },{
+<<<<<<< HEAD
             t("#import(\"@local/"),i(1),t(":0.1.0\"):*")
+=======
+            t("#import(\"@local/"),i(1),t(":0."),i(2,"1"),t(".0\"):*")
+>>>>>>> 80d7e6a (remove vscode settings, move from typst.vim to tinymist, optimize snippet)
         })
     )
     local alpha={"thrm","def","lemma","corol","example","caution","prop","idea"}
@@ -150,7 +159,11 @@ local function Symbols()
         { "qed", "∎" },
         { "rf", "∀" },
         { "cy", "∃" },
+<<<<<<< HEAD
         { "∃n", "∄", "a" },
+=======
+        { "∃n;", "∄", "a" },
+>>>>>>> 80d7e6a (remove vscode settings, move from typst.vim to tinymist, optimize snippet)
         { "alef", "א" },
         { "ks", "∅" },
         { "lap", "∆"},
@@ -208,11 +221,19 @@ local function GreekLetters()
     }
 
     for k, v in ipairs(alpha) do
+<<<<<<< HEAD
         asnip(s({ trig = "\\" .. v[1], hidden = true }, { t(v[2][1]) },
             { condition = mathZone }
         ))
         asnip(s(
             { trig = "\\" .. string.upper(string.sub(v[1], 1, 1)) .. string.sub(v[1], 2), hidden = true },
+=======
+        asnip(s({ trig = "\\" .. v[1] }, { t(v[2][1]) },
+            { condition = mathZone }
+        ))
+        asnip(s(
+            { trig = "\\" .. string.upper(string.sub(v[1], 1, 1)) .. string.sub(v[1], 2) },
+>>>>>>> 80d7e6a (remove vscode settings, move from typst.vim to tinymist, optimize snippet)
             { t(v[2][2]) }, { condition = mathZone }
         ))
         switchsnip({ v[2][1], v[2][2] })
@@ -222,8 +243,12 @@ GreekLetters()
 
 --大型运算符
 local function BigOperators()
+<<<<<<< HEAD
     local alpha1 = { "sum", "prod", "coprod", "plusc", "timec", "bcdot", "bcup", "bcupf", "bcupj", "bcap", "bcapf",
         "band", "bor" }
+=======
+    local alpha1 = { "sum", "prod", "coprod", "plusc", "timec", "bcdot", "bcup", "bcupf", "bcupj", "bcap", "bcapf", "band", "bor" }
+>>>>>>> 80d7e6a (remove vscode settings, move from typst.vim to tinymist, optimize snippet)
     local alpha2 = { "∑", "∏", "∐", "⨁", "⨂", "⨀", "⋃", "⨆", "⨄", "⋂", "⨅", "⋀", "⋁" }
     for j = 1, #alpha1 do
         snip(
@@ -231,12 +256,17 @@ local function BigOperators()
                 { condition = mathZone })
         )
         snip(
+<<<<<<< HEAD
             s({ trig = alpha1[j] .. " (%w+[^%s]*) (%w+[^%s]*) (%w+[^%s]*)", hidden = true, trigEngine = "pattern" }, {
+=======
+            s({ trig = alpha1[j] .. " (%w|[^!-`][^%s]*) (%w|[^!-`][^%s]*) (%w|[^!-`][^%s]*)", hidden = true, trigEngine = "pattern" }, {
+>>>>>>> 80d7e6a (remove vscode settings, move from typst.vim to tinymist, optimize snippet)
                 t(alpha2[j] .. " _( "),
                 f(function(arg, snip, userArg) return snip.captures[1] end, {}, {}),
                 t(" = "),
                 f(function(arg, snip, userArg) return snip.captures[2] end, {}, {}),
                 t(" ) ^( "),
+<<<<<<< HEAD
                 f(
                     function(args, snip, userArg)
                         if snip.captures[3] == 'inf' then
@@ -245,6 +275,9 @@ local function BigOperators()
                         return snip.captures[3]
                     end
                     , {}, {}),
+=======
+                f(function(arg, snip, userArg) return snip.captures[3] end, {}, {}),
+>>>>>>> 80d7e6a (remove vscode settings, move from typst.vim to tinymist, optimize snippet)
                 t(" ) ")
             }, { condition = mathZone })
         )
@@ -265,14 +298,24 @@ local function Operators()
     local alpha = {
         { "aa", "+", "a" },
         { "tt", "×", "a" },
+<<<<<<< HEAD
         { "×l", "⋉", "a" },
         { "×r", "⋊", "a" },
+=======
+        { "×l", "⋉" },
+        { "×r", "⋊" },
+>>>>>>> 80d7e6a (remove vscode settings, move from typst.vim to tinymist, optimize snippet)
         { "+-", "±" },
         { "-+", "∓" },
         { "xx", "∗" },
         { "star", "⋆" },
+<<<<<<< HEAD
         { "+o", "⊕", "a" },
         { "×o", "⊗", "a" },
+=======
+        { "+o", "⊕" },
+        { "×o", "⊗"},
+>>>>>>> 80d7e6a (remove vscode settings, move from typst.vim to tinymist, optimize snippet)
         { "..", { "⋅", "•" } },
         { "⋅.", "⋯", "a" },
         { "cir", { "∘", "⚬" } },
@@ -305,6 +348,7 @@ Operators()
 --关系符
 local function Relations()
     local alpha = {
+<<<<<<< HEAD
         { "ee", { "=", "≡" }, "n" },
         { "ne", { "≠", "≢" }, "n" },
 
@@ -365,6 +409,47 @@ local function Relations()
         { "≼.", "≽" },
         { "⊀.", "⊁" },
         { "⋠.", "⋡" },
+=======
+        { "ee", "=", "n" },
+        { "ne", "≠", "n" },
+        { "eee", "≡" , "n" },
+        { "≡n",  "≢" },
+        { "≢n",  "≡" },
+        { "eeee", "≣" ,"n" },
+
+        { ">,", "<" },
+        { ".e", "≥" },{ "≥,", "≤" },
+        { ">n", "≯", "n" },{ "≯,", "≮" },
+        { "≥n", "≱", "n" },{ "≱,", "≰" },
+        { ">t", "⊳" },{ "⊳,", "⊲" },
+        { "⊳e", "⊵" },{ "⊵,", "⊴" },
+        { "⊳n", "⋫" },{ "⋫,", "⋪" },
+        { "⋫e", "⋭" },{ "⋭,", "⋬" },
+        { "⊵n", "⋭" },
+
+        { ">c", "≻" },{ "≻,", "≺" },
+        { "≻e", "≽" },{ "≽,", "≼" },
+        { "≻n", "⊁" },{ "⊁,", "⊀" },
+        { "⊁n", "⋡" },{ "⋡,", "⋠" },
+        { "≽n", "⋡" },
+
+        { "<.", ">" },
+        { ",e", "≤" },{ "≤.", "≥" },
+        { "<n", "≮", "n" },{ "≮.", "≯" },
+        { "≤n", "≰", "n" },{ "≰.", "≱" },
+
+        { "<t", "⊲" },{ "⊲.", "⊳" },
+        { "⊲e", "⊴" },{ "⊴.", "⊵" },
+        { "⊲n", "⋪" },{ "⋪.", "⋫" },
+        { "⋪e", "⋬" },{ "⋬.", "⋭" },
+        { "⊴n", "⋬" },
+
+        { "<c", "≺" },{ "≺.", "≻" },
+        { "≺e", "≼" },{ "≼.", "≽" },
+        { "≺n", "⊀" },{ "⊀.", "⊁" },
+        { "⊀c", "⋠" },{ "⋠.", "⋡" },
+        { "≼n", "⋠" },
+>>>>>>> 80d7e6a (remove vscode settings, move from typst.vim to tinymist, optimize snippet)
 
         { "sim", "〜", "n" },
 
@@ -373,11 +458,17 @@ local function Relations()
         { "vgiu", "∣", "n" },
         { "∣n", "∤" },
 
+<<<<<<< HEAD
         { "in", "∈", "n" },
         { "∈n", "∉" },
 
         { "∋n", "∌" },
 
+=======
+        { "in;", "∈" },
+        { "∈n", "∉" },{ "∉n", "∈"},
+        { "∋n", "∌" },{ "∌n", "∋",},
+>>>>>>> 80d7e6a (remove vscode settings, move from typst.vim to tinymist, optimize snippet)
         { "∈,", "∋" },
         { "∉,", "∌" },
         { "∋.", "∈" },
@@ -389,6 +480,7 @@ local function Relations()
         { "⟕r", "⟗" },
         { "⟖l", "⟗" },
 
+<<<<<<< HEAD
         { "sub", "⊂", "n" },
         { "⊂n", "⊄" },
         { "⊂e", "⊆" },
@@ -414,6 +506,24 @@ local function Relations()
         { ":=", "≔" },
         { "=def", "≝" },
 
+=======
+        { "sub;", "⊂" },{ "⊂,", "⊃" },
+        { "⊂n", "⊄" },{ "⊄n", "⊂" },{ "⊄,", "⊅" },
+        { "⊂e", "⊆" },{ "⊆,", "⊇" },
+        { "⊆n", { "⊊", "⊈" } },{ "⊊n" , "⊆" },{ "⊈n" , "⊆" },{ "⊊,", "⊋" },{ "⊈,", "⊉" },
+        { "sup;", "⊃" },{ "⊃.", "⊂" },
+        { "⊃n", "⊅" },{ "⊅.", "⊄" },
+        { "⊃e", "⊇" },{ "⊇.", "⊆" },
+        { "⊇n", { "⊋", "⊉" } },{ "⊋n", "⊇" },{ "⊉n", "⊇" },{ "⊋.", "⊊" },{ "⊉.", "⊈" },
+        
+        { ":=", "≔" },
+        { "=def", "≝" },
+        { "=?", "≟"},
+        { "se" ,"⋍" ,"n" },
+        { "⋍n", "≄" },{ "≄n", "⋍" },
+        { "see" ,"≅" ,"n" },
+        { "≅n", "≇" },{ "≇n", "≅" },
+>>>>>>> 80d7e6a (remove vscode settings, move from typst.vim to tinymist, optimize snippet)
     }
     addSimpleSnip(alpha, "a", false)
 end
@@ -444,10 +554,17 @@ local function Arrows()
     }
 
     asnip(
+<<<<<<< HEAD
         s({ trig = "a;.", hidden = true }, { t("→") }, { condition = mathZone })
     )
     asnip(
         s({ trig = "a;,", hidden = true }, { t("←") }, { condition = mathZone })
+=======
+        s({ trig = "arr.", hidden = true }, { t("→") }, { condition = mathZone })
+    )
+    asnip(
+        s({ trig = "arr,", hidden = true }, { t("←") }, { condition = mathZone })
+>>>>>>> 80d7e6a (remove vscode settings, move from typst.vim to tinymist, optimize snippet)
     )
     asnip(
         s({ trig = "a..", hidden = true }, { t("⇒") }, { condition = mathZone })
@@ -700,6 +817,7 @@ Brackets()
 --文字
 local function Texts()
     asnip(
+<<<<<<< HEAD
         s({ trig = "s.t.", hidden = true }, { t("space.en \"s.t.\" space.en ") }, { condition = mathZone })
     )
     snip(
@@ -716,6 +834,24 @@ local function Texts()
     )
     snip(
         s({ trig = "or", hidden = true }, { t("space.en \"or\" space.en ") }, { condition = mathZone })
+=======
+        s({ trig = "s.t.", hidden = true }, { t("stW") }, { condition = mathZone })
+    )
+    snip(
+        s({ trig = "and", hidden = true }, { t("andW") }, { condition = mathZone })
+    )
+    snip(
+        s({ trig = "ksw", hidden = true }, { t("space.en ") }, { condition = mathZone })
+    )
+    snip(
+        s({ trig = "iff", hidden = true }, { t("iffW ") }, { condition = mathZone })
+    )
+    snip(
+        s({ trig = "if", hidden = true }, { t("ifW") }, { condition = mathZone })
+    )
+    snip(
+        s({ trig = "or", hidden = true }, { t("orW") }, { condition = mathZone })
+>>>>>>> 80d7e6a (remove vscode settings, move from typst.vim to tinymist, optimize snippet)
     )
 end
 Texts()
@@ -788,7 +924,11 @@ local function Root()
     )
     asnip(
         s({ trig = "root;([^%s])", wordTrig = false, hidden = true, trigEngine = "pattern" },
+<<<<<<< HEAD
             { t("root( "), i(2), t(" , "), f(function(arg, snip, userArg) return snip.captures[1] end, {}), i(1),
+=======
+            { t("root( "), i(1), t(" , "), f(function(arg, snip, userArg) return snip.captures[1] end, {}), i(2),
+>>>>>>> 80d7e6a (remove vscode settings, move from typst.vim to tinymist, optimize snippet)
                 t(" ) ") }, { condition = mathZone })
     )
 end
