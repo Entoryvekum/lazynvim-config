@@ -21,19 +21,11 @@ map(
     "<Tab>",
     function()
         if require("luasnip").expandable() then
-<<<<<<< HEAD
-            return '<Plug>luasnip-expand-snippet'
-=======
             require("luasnip").expand()
->>>>>>> 80d7e6a (remove vscode settings, move from typst.vim to tinymist, optimize snippet)
         else
             return "<Tab>"
         end
     end, {
-<<<<<<< HEAD
-        expr = true,
-=======
->>>>>>> 80d7e6a (remove vscode settings, move from typst.vim to tinymist, optimize snippet)
         silent = true,
     }
 )
@@ -70,11 +62,7 @@ map(
 )
 map(
     {"n"},
-<<<<<<< HEAD
-    "<leader>typ", "<cmd>TypstPreview<cr>",
-=======
     "<leader>tt", "<cmd>TypstPreview<cr>",
->>>>>>> 80d7e6a (remove vscode settings, move from typst.vim to tinymist, optimize snippet)
     {desc = "Preview Typst document"}
 )
 map(
