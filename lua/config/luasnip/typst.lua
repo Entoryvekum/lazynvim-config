@@ -24,7 +24,7 @@ local postfix = require("luasnip.extras.postfix").postfix
 local types = require("luasnip.util.types")
 local parse = require("luasnip.util.parser").parse_snippet
 local ms = ls.multi_snippet
-local k = require("luasnip.nodes.key_indexer").new_key
+local key = require("luasnip.nodes.key_indexer").new_key
 
 local snippets, autosnippets = {}, {}
 
@@ -72,7 +72,7 @@ local function addSimpleSnip(alpha, defaultType, hide, con)
 		if defaultType == "n" then
 			return x == "a"
 		else
-			return x ~= "n"
+			return x ~= " n"
 		end
 	end
 
@@ -93,42 +93,62 @@ local function addSimpleSnip(alpha, defaultType, hide, con)
 end
 
 -- --------------------------------测试--------------------------------
-local test1 = s("sniptest:hello", { t("hello world!") })
+local test1 = s("test:text", { t("hello world!") })
 snip(test1)
 
 local test2 =
-	s("sniptest:insert", { i(2, ">>>Insert 1<<<"), t(" "), sn(1, { i(1, ">>>Insert 2<<<") }), i(3, ">>>Insert 3<<<") })
+	s("test:insert", { i(2, ">>>Insert 1<<<"), t(" "), sn(1, { i(1, ">>>Insert 2<<<") }), i(3, ">>>Insert 3<<<") })
 snip(test2)
 
+local function recursivePrint(x)
+	if type(x) == "string" then
+		return '"' .. x .. '"'
+	elseif type(x) == "table" then
+		local ans = "{"
+		local flag = false
+		for k, v in pairs(x) do
+			if flag then
+				ans = ans .. ", " .. tostring(k) .. ":" .. recursivePrint(v)
+			else
+				flag = true
+				ans = ans .. tostring(k) .. ":" .. recursivePrint(v)
+			end
+		end
+		return ans .. "}"
+	elseif type(x) == "number" or type(x) == "boolean" then
+		return tostring(x)
+	else
+		return "<" .. tostring(x) .. ">"
+	end
+end
+
+local test3 = s("test:function", {
+	t("<1: "),
+	i(1),
+	t(">"),
+	f(function(arg, parent, userArg)
+		return arg[1][1] .. arg[2][1]
+	end, { 1, 2 }, {}),
+	t("<2: "),
+	i(2),
+	t(">"),
+})
+snip(test3)
+
+local test4data = {
+	t("<"),
+	i(1),
+	t(">"),
+	f(function(arg, parent, userArg)
+		return arg[1][1]
+	end, { 1 }, {}),
+}
+local test3 = s("test:parent", { test4data[1], test4data[2], test4data[3], test4data[4], t(recursivePrint(test4data)) })
+snip(test3)
 --------------------------------环境--------------------------------
+--数学环境
 local function MathEnvironment()
-	--数学环境
 	asnip(s({ trig = ";;", wordTrig = false }, { t("$"), i(1), t(" $") }, { condition = plainText }))
-	asnip(s({ trig = ";'", wordTrig = false }, { t("$  "), i(1), t("  $") }, { condition = plainText }))
-	snip(s({ trig = "NoteTemplate" }, {
-		t({ '#import("@local/NoteTemplate:0.1.0"):*', "", "" }),
-		t({ "#Note(", "" }),
-		t('    headline:"'),
-		i(1),
-		t({ '",', "" }),
-		t('    title:"'),
-		i(2),
-		t({ '",', "" }),
-		t('    author:"'),
-		i(3, "Entoryverkum"),
-		t({ '",', "" }),
-		t('    email:"'),
-		i(4, "entoryvekum@outlook.com"),
-		t({ '",', "" }),
-		t('    time:"'),
-		i(5, "2020"),
-		t({ '",', "" }),
-		t("    pagebreakBeforeOutline:false"),
-		t({ ",", "" }),
-		t(")["),
-		i(6),
-		t("]"),
-	}))
 	snip(s({ trig = "template" }, {
 		t('#import("@local/'),
 		i(1),
@@ -136,16 +156,6 @@ local function MathEnvironment()
 		i(2, "1"),
 		t('.0"):*'),
 	}))
-	local alpha = { "thrm", "def", "lemma", "corol", "example", "caution", "prop", "idea" }
-	for k, v in ipairs(alpha) do
-		snip(s({ trig = "#" .. v }, {
-			t("#" .. v .. "( name: ["),
-			i(1),
-			t("] )["),
-			i(2),
-			t("]"),
-		}))
-	end
 end
 MathEnvironment()
 
@@ -157,7 +167,7 @@ local function Symbols()
 		{ "qed", "∎" },
 		{ "rf", "∀" },
 		{ "cy", "∃" },
-		{ "∃n;", "∄", "a" },
+		{ "∃;n", "∄", "a" },
 		{ "alef", "א" },
 		{ "ks", "∅" },
 		{ "lap", "∆" },
@@ -192,10 +202,10 @@ local function GreekLetters()
 		{ "b", { "β", "Β" } },
 		{ "g", { "γ", "Γ" } },
 		{ "d", { "δ", "Δ" } },
-		{ "ep", { "ε", "Ε" } },
+		{ "ep", { "ε", "ϵ", "Ε" } },
 		{ "z", { "ζ", "Ζ" } },
 		{ "et", { "η", "Η" } },
-		{ "th", { "θ", "Θ" } },
+		{ "th", { "θ", "ϑ", "Θ" } },
 		{ "i", { "ι", "Ι" } },
 		{ "k", { "κ", "Κ" } },
 		{ "l", { "λ", "Λ" } },
@@ -208,7 +218,7 @@ local function GreekLetters()
 		{ "s", { "σ", "Σ" } },
 		{ "ta", { "τ", "Τ" } },
 		{ "u", { "υ", "Υ" } },
-		{ "ph", { "φ", "Φ" } },
+		{ "ph", { "φ", "ϕ", "Φ" } },
 		{ "c", { "χ", "Χ" } },
 		{ "ps", { "ψ", "Ψ" } },
 		{ "og", { "ω", "Ω" } },
