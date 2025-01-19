@@ -75,6 +75,7 @@ local mainConf={
         opts = {
             history = true,
             delete_check_events = "TextChanged,TextChangedI",
+            update_events = "TextChanged,TextChangedI",
             enable_autosnippets = true,
             store_selection_keys = "<tab>",
         },
