@@ -17,20 +17,40 @@ local function map(mode, lhs, rhs, opts)
 end
 
 map(
+    { "i", "n", "s" },
+    "<Plug>ls-expand",
+    function()
+        require("luasnip").expand()
+    end,{
+        silent = true,
+    }
+)
+map(
+    { "i", "n", "s" },
+    "<Plug>ls-next-choice",
+    function()
+        require("luasnip").change_choice(1)
+    end,{
+        silent = true,
+    }
+)
+
+map(
     { "i", "n" },
     "<Tab>",
     function()
         if require("luasnip").expandable() then
-            require("luasnip").expand()
+            return "<Plug>ls-expand"
         else
             return "<Tab>"
         end
     end, {
         silent = true,
+        expr = true,
     }
 )
 map(
-    { "i", "n","s" },
+    { "i", "n", "s" },
     "<C-F10>",
     function()
         require("luasnip").jump(1)
@@ -52,12 +72,13 @@ map(
     "<C-E>",
     function()
         if require("luasnip").choice_active() then
-            require("luasnip").change_choice(1)
+            return "<Plug>ls-next-choice"
         else
             return "<C-E>"
         end
     end, {
         silent = true,
+        expr = true,
     }
 )
 map(

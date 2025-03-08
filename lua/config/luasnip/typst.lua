@@ -29,11 +29,19 @@ local key = require("luasnip.nodes.key_indexer").new_key
 local snippets, autosnippets = {}, {}
 
 local function mathZone()
-	return true
+	if vim.treesitter.get_node():type() == "math" then
+		return true
+	else
+		return false
+	end
 end
 
 local function plainText()
-	return true
+	if vim.treesitter.get_node():type() ~= "math" then
+		return true
+	else
+		return false
+	end
 end
 
 local function snip(val)
@@ -44,111 +52,199 @@ local function asnip(val)
 	table.insert(autosnippets, val)
 end
 
-local function switchsnip(arr, con)
-	if con == nil then
-		con = mathZone
-	end
+local function switchSnip(arr, opts)
 	for j = 1, #arr do
+		opts.trig = arr[j]
 		if j == #arr then
-			snip(s({ trig = arr[j], hidden = true }, { t(arr[1]) }, { condition = con }))
+			snip(s(opts, { t(arr[1]) }))
 		else
-			snip(s({ trig = arr[j], hidden = true }, { t(arr[j + 1]) }, { condition = con }))
+			snip(s(opts, { t(arr[j + 1]) }))
 		end
 	end
 end
 
-local function addSimpleSnip(alpha, defaultType, hide, con)
+local function transferSnip(arr, opts)
+	for k1, v1 in ipairs(arr) do
+		for k2, v2 in ipairs(arr) do
+			if k1 ~= k2 then
+				opts.trig = v2[1] .. v1[2]
+				asnip(s(opts, { t(v1[1]) }))
+			end
+		end
+	end
+end
+
+local function linkSnip(arr, opts)
+	local prev
+	for k, v in ipairs(arr) do
+		if prev == nil then
+			prev = v
+		else
+			local addSnip = v.auto and asnip or snip
+			v.trig = prev .. v[1]
+			for optName, optVal in ipairs(opts) do
+				if v[optName] == nil then
+					v[optName] = optVal
+				end
+			end
+			addSnip(s(v, { t(v[2]) }))
+		end
+	end
+end
+
+local function simpleSnip(alpha, defaultType, opts)
 	if defaultType == nil or (defaultType ~= "a" and defaultType ~= "n") then
 		defaultType = "n"
-	end
-	if hide == nil then
-		hide = true
-	end
-	if con == nil then
-		con = mathZone
 	end
 
 	local isauto = function(x)
 		if defaultType == "n" then
 			return x == "a"
 		else
-			return x ~= " n"
+			return x ~= "n"
 		end
 	end
 
 	local addSnip
 	for k, v in ipairs(alpha) do
-		if isauto(v[3]) then
+		if isauto(v[3].auto) then
 			addSnip = asnip
 		else
 			addSnip = snip
 		end
-		if type(v[2]) == "table" then
-			addSnip(s({ trig = v[1], hidden = hide }, { t(v[2][1]) }, { condition = mathZone }))
-			switchsnip(v[2])
-		else
-			addSnip(s({ trig = v[1], hidden = hide }, { t(v[2]) }, { condition = mathZone }))
-		end
-	end
-end
-
--- --------------------------------测试--------------------------------
-local test1 = s("test:text", { t("hello world!") })
-snip(test1)
-
-local test2 =
-	s("test:insert", { i(2, ">>>Insert 1<<<"), t(" "), sn(1, { i(1, ">>>Insert 2<<<") }), i(3, ">>>Insert 3<<<") })
-snip(test2)
-
-local function recursivePrint(x)
-	if type(x) == "string" then
-		return '"' .. x .. '"'
-	elseif type(x) == "table" then
-		local ans = "{"
-		local flag = false
-		for k, v in pairs(x) do
-			if flag then
-				ans = ans .. ", " .. tostring(k) .. ":" .. recursivePrint(v)
-			else
-				flag = true
-				ans = ans .. tostring(k) .. ":" .. recursivePrint(v)
+		local curOpts = v[3]
+		for optName, optVal in ipairs(opts) do
+			if curOpts[optName] == nil then
+				curOpts[optName] = optVal
 			end
 		end
-		return ans .. "}"
-	elseif type(x) == "number" or type(x) == "boolean" then
-		return tostring(x)
-	else
-		return "<" .. tostring(x) .. ">"
+		curOpts.trig = v[1]
+		if type(v[2]) == "table" then
+			addSnip(s(curOpts, { t(v[2][1]) }))
+			switchSnip(v[2])
+		else
+			addSnip(s(curOpts, { t(v[2]) }))
+		end
 	end
 end
 
-local test3 = s("test:function", {
-	t("<1: "),
-	i(1),
-	t(">"),
-	f(function(arg, parent, userArg)
-		return arg[1][1] .. arg[2][1]
-	end, { 1, 2 }, {}),
-	t("<2: "),
-	i(2),
-	t(">"),
-})
-snip(test3)
+local mathOptShow = { hidden = true, wordTrig = false, condition = mathZone }
+local mathOptHide = { hidden = false, wordTrig = false, condition = mathZone }
 
-local test4data = {
-	t("<"),
-	i(1),
-	t(">"),
-	f(function(arg, parent, userArg)
-		return arg[1][1]
-	end, { 1 }, {}),
-}
-local test3 = s("test:parent", { test4data[1], test4data[2], test4data[3], test4data[4], t(recursivePrint(test4data)) })
-snip(test3)
+----------------------------------测试--------------------------------
+local function tests()
+	local test1 = s("test:text", { t("hello world!") })
+	snip(test1)
+
+	local test2 =
+		s("test:insert", { i(2, ">>>insert 1<<<"), t(" "), sn(1, { i(1, ">>>insert 2<<<") }), i(3, ">>>insert 3<<<") })
+	snip(test2)
+
+	local function recursiveprint(x, n, m) --n: 最大层数
+		if m == nil then
+			m = 1
+		end
+		if type(x) == "string" then
+			return '"' .. x .. '"'
+		elseif type(x) == "table" then
+			local ans = "{"
+			local flag = false
+			for k, v in pairs(x) do
+				if flag then
+					if m == n then
+						ans = ans .. ", " .. tostring(k) .. ":" .. tostring(v)
+					else
+						ans = ans .. ", " .. tostring(k) .. ":" .. recursiveprint(v, n, m + 1)
+					end
+				else
+					flag = true
+					if m == n then
+						ans = ans .. tostring(k) .. ":" .. tostring(v)
+					else
+						ans = ans .. tostring(k) .. ":" .. recursiveprint(v, n, m + 1)
+					end
+				end
+			end
+			return ans .. "}"
+		elseif type(x) == "number" or type(x) == "boolean" then
+			return tostring(x)
+		else
+			return "<" .. tostring(x) .. ">"
+		end
+	end
+
+	local test3 = s("test:function", {
+		t("<1: "),
+		i(1),
+		t(">"),
+		f(function(arg, parent, userarg)
+			return arg[1][1] .. arg[2][1]
+		end, { 1, 2 }, {}),
+		t("<2: "),
+		i(2),
+		t(">"),
+	})
+	snip(test3)
+
+	local test4data = {
+		t("<"),
+		i(1),
+		t(">"),
+		f(function(arg, parent, userarg)
+			return arg[1][1]
+		end, { 1 }, {}),
+	}
+	local test4 =
+		s("test:print", { test4data[1], test4data[2], test4data[3], test4data[4], t(recursiveprint(test4data)) })
+	snip(test4)
+
+	local test5 = s("test:printparent1", {
+		f(function(arg, parent, userarg)
+			return recursiveprint(parent, 3)
+		end, {}, {}),
+	})
+	snip(test5)
+
+	local test6 = s("test:printparent2", {
+		sn(1, {
+			f(function(arg, parent, userarg)
+				return recursiveprint(parent, 3)
+			end, {}, {}),
+		}),
+	})
+	snip(test6)
+
+	local test7 = s("test:argi", {
+		i(1),
+		t(": "),
+		f(function(arg, parent, userarg)
+			return recursiveprint(arg)
+		end, { 1 }, {}),
+	})
+	snip(test7)
+
+	local test8 = s("test:argsn", {
+		sn(1, { i(1), t(","), i(2) }),
+		t(": "),
+		f(function(arg, parent, userarg)
+			return recursiveprint(arg)
+		end, { 1 }, {}),
+	})
+	snip(test8)
+
+	local test9 = s("test:ts", {
+		f(function()
+			return tostring(vim.treesitter.get_node():type())
+		end, {}, {}),
+	})
+	snip(test9)
+end
+tests()
+
 --------------------------------环境--------------------------------
 --数学环境
 local function MathEnvironment()
-	asnip(s({ trig = ";;", wordTrig = false }, { t("$"), i(1), t(" $") }, { condition = plainText }))
+	asnip(s({ trig = ";;", wordTrig = false, condition = plainText }, { t("$"), i(1), t(" $") }))
 	snip(s({ trig = "template" }, {
 		t('#import("@local/'),
 		i(1),
@@ -160,29 +256,30 @@ end
 MathEnvironment()
 
 --------------------------------符号--------------------------------
+
 --普通符号
 local function Symbols()
 	local alpha = {
-		{ "oo", "∞" },
-		{ "qed", "∎" },
-		{ "rf", "∀" },
-		{ "cy", "∃" },
-		{ "∃;n", "∄", "a" },
-		{ "alef", "א" },
-		{ "ks", "∅" },
-		{ "lap", "∆" },
-		{ "nab", "∇" },
-		{ "par", "∂" },
-		{ "|m", "mid(|)", "a" },
+		{ "oo;", "∞" },
+		{ "qed;", "∎" },
+		{ "rf;", "∀" },
+		{ "cy;", "∃" },
+		{ "∃n", "∄" },
+		{ "alef;", "א" },
+		{ "ks;", "∅" },
+		{ "lap;", "∆" },
+		{ "nab;", "∇" },
+		{ "par;", "∂" },
+		{ "|m", "mid(|)" },
 	}
-	addSimpleSnip(alpha, "n", false)
+	simpleSnip(alpha, "a", mathOptHide)
 end
 Symbols()
 
 --积分
 local function Integrals()
 	local alpha = {
-		{ ";i", "∫" },
+		{ "int;", "∫" },
 		{ "∫i", "∬" },
 		{ "∬i", "∭" },
 		{ "∮i", "∯" },
@@ -191,7 +288,7 @@ local function Integrals()
 		{ "∬o", "∯" },
 		{ "∭o", "∰" },
 	}
-	addSimpleSnip(alpha, "a")
+	simpleSnip(alpha, "a", mathOptHide)
 end
 Integrals()
 
@@ -225,15 +322,12 @@ local function GreekLetters()
 	}
 
 	for k, v in ipairs(alpha) do
-		asnip(s({ trig = "\\" .. v[1] }, { t(v[2][1]) }, { condition = mathZone }))
-		asnip(
-			s(
-				{ trig = "\\" .. string.upper(string.sub(v[1], 1, 1)) .. string.sub(v[1], 2) },
-				{ t(v[2][2]) },
-				{ condition = mathZone }
-			)
-		)
-		switchsnip({ v[2][1], v[2][2] })
+		asnip(s({ trig = "'" .. v[1], condition = mathZone }, { t(v[2][1]) }))
+		asnip(s({
+			trig = "'" .. string.upper(string.sub(v[1], 1, 1)) .. string.sub(v[1], 2),
+			condition = mathZone,
+		}, { t(v[2][#v[2]]) }))
+		switchSnip(v[2])
 	end
 end
 GreekLetters()
@@ -245,16 +339,13 @@ local function BigOperators()
 	local alpha2 = { "∑", "∏", "∐", "⨁", "⨂", "⨀", "⋃", "⨆", "⨄", "⋂", "⨅", "⋀", "⋁" }
 	for j = 1, #alpha1 do
 		snip(
-			s(
-				{ trig = alpha1[j], hidden = true },
-				{ t(alpha2[j] .. " _( "), i(1), t(" ) ^( "), i(2), t(" ) ") },
-				{ condition = mathZone }
-			)
+			s({ trig = alpha1[j], condition = mathZone }, { t(alpha2[j] .. " _( "), i(1), t(" ) ^( "), i(2), t(" ) ") })
 		)
 		snip(s({
 			trig = alpha1[j] .. " (%w|[^!-`][^%s]*) (%w|[^!-`][^%s]*) (%w|[^!-`][^%s]*)",
 			hidden = true,
 			trigEngine = "pattern",
+			condition = mathZone,
 		}, {
 			t(alpha2[j] .. " _( "),
 			f(function(arg, snip, userArg)
@@ -269,88 +360,86 @@ local function BigOperators()
 				return snip.captures[3]
 			end, {}, {}),
 			t(" ) "),
-		}, { condition = mathZone }))
-		asnip(s({ trig = alpha1[j] .. ";(.)", hidden = true, trigEngine = "pattern" }, {
+		}))
+		asnip(s({ trig = alpha1[j] .. ";(.)", hidden = true, trigEngine = "pattern", condition = mathZone }, {
 			t(alpha2[j] .. " _( "),
 			f(function(arg, snip, userArg)
 				return snip.captures[1]
 			end, {}, {}),
 			i(1),
 			t(" ) "),
-		}, { condition = mathZone }))
+		}))
 	end
 end
 BigOperators()
 
 --运算符
 local function Operators()
-	local alpha = {
-		{ "aa", "+", "a" },
-		{ "tt", "×", "a" },
+	local arr = {
+		{ "aa;", "+" },
+		{ "tt;", "×" },
 		{ "×l", "⋉" },
 		{ "×r", "⋊" },
 		{ "+-", "±" },
 		{ "-+", "∓" },
-		{ "xx", "∗" },
-		{ "star", "⋆" },
+		{ "xx;", "∗" },
+		{ "star;", "⋆" },
 		{ "+o", "⊕" },
 		{ "×o", "⊗" },
 		{ "..", { "⋅", "•" } },
-		{ "⋅.", "⋯", "a" },
-		{ "cir", { "∘", "⚬" } },
-		{ "and", "∧" },
-		{ "or", "∨" },
-		{ "cup", { "∪", "⊔" } },
-		{ "cap", { "∩", "⨅" } },
-		{ "ni", "∖" },
-
-		{ "⋯v", "⋮", "a" },
-		{ "⋱v", "⋮", "a" },
-		{ "⋰v", "⋮", "a" },
-
-		{ "⋮h", "⋯", "a" },
-		{ "⋱h", "⋯", "a" },
-		{ "⋰h", "⋯", "a" },
-
-		{ "⋯d", "⋱", "a" },
-		{ "⋮d", "⋱", "a" },
-		{ "⋰d", "⋱", "a" },
-
-		{ "⋯u", "⋰", "a" },
-		{ "⋮u", "⋰", "a" },
-		{ "⋱u", "⋰", "a" },
+		{ "⋅.", "⋯" },
+		{ "cir;", { "∘", "⚬" } },
+		{ "and;", "∧" },
+		{ "or;", "∨" },
+		{ "cup;", { "∪", "⊔" } },
+		{ "cap;", { "∩", "⨅" } },
+		{ "ni;", "∖" },
 	}
-	addSimpleSnip(alpha, "n", false)
+	local trans = {
+		{ "⋯", "h" },
+		{ "⋱", "d" },
+		{ "⋰", "u" },
+	}
+	transferSnip(trans, mathOptHide)
+	simpleSnip(arr, "a", mathOptShow)
 end
 Operators()
 
 --关系符
 local function Relations()
-	local alpha = {
-		{ "ee", "=", "n" },
-		{ "ne", "≠", "n" },
-		{ "eee", "≡", "n" },
+	local arr1 = {
+		{ "ee;", "=" },
+		{ "ne;", "≠" },
+		{ "eee", "≡" },
 		{ "≡n", "≢" },
 		{ "≢n", "≡" },
-		{ "eeee", "≣", "n" },
-
-		{ ">,", "<" },
+		{ "eeee", "≣" },
 		{ ".e", "≥" },
-		{ "≥,", "≤" },
-		{ ">n", "≯", "n" },
-		{ "≯,", "≮" },
-		{ "≥n", "≱", "n" },
-		{ "≱,", "≰" },
+	}
+	simpleSnip(arr1, "a", mathOptShow)
+	local arr2 = {
+
+		{ ".e", "≥" },
+		{ ">n", "≯" },
+		{ "≥n", "≱" },
 		{ ">t", "⊳" },
-		{ "⊳,", "⊲" },
 		{ "⊳e", "⊵" },
-		{ "⊵,", "⊴" },
 		{ "⊳n", "⋫" },
 		{ "⋫,", "⋪" },
 		{ "⋫e", "⋭" },
 		{ "⋭,", "⋬" },
 		{ "⊵n", "⋭" },
-
+	}
+	switchSnip({ { "<", "," }, { ">", "." } }, mathOptHide)
+	switchSnip({ { "≮", "," }, { "≯", "." } }, mathOptHide)
+	switchSnip({ { "≤", "," }, { "≥", "." } }, mathOptHide)
+	switchSnip({ { "≰", "," }, { "≱", "." } }, mathOptHide)
+	switchSnip({ { "≰", "," }, { "≱", "." } }, mathOptHide)
+	switchSnip({ { "≰", "," }, { "≱", "." } }, mathOptHide)
+	switchSnip({ { "⊲", "," }, { "⊳", "." } }, mathOptHide)
+	switchSnip({ { "⊴", "," }, { "⊵", "." } }, mathOptHide)
+	switchSnip({ { "⊴", "," }, { "⊵", "." } }, mathOptHide)
+	local arr3 = {
 		{ ">c", "≻" },
 		{ "≻,", "≺" },
 		{ "≻e", "≽" },
@@ -389,11 +478,11 @@ local function Relations()
 		{ "⋠.", "⋡" },
 		{ "≼n", "⋠" },
 
-		{ "sim", "〜", "n" },
+		{ "sim", "〜" },
 
-		{ "prop", "∝", "n" },
+		{ "prop", "∝" },
 
-		{ "vgiu", "∣", "n" },
+		{ "vgiu", "∣" },
 		{ "∣n", "∤" },
 
 		{ "in;", "∈" },
@@ -439,14 +528,15 @@ local function Relations()
 		{ ":=", "≔" },
 		{ "=def", "≝" },
 		{ "=?", "≟" },
-		{ "se", "⋍", "n" },
+		{ "se;", "⋍" },
 		{ "⋍n", "≄" },
 		{ "≄n", "⋍" },
-		{ "see", "≅", "n" },
+		{ "see;", "≅" },
 		{ "≅n", "≇" },
 		{ "≇n", "≅" },
 	}
-	addSimpleSnip(alpha, "a", false)
+	simpleSnip(alpha, "a", { hidden = true, wordTrig = false, condition = mathZone })
+	switchSnip({})
 end
 Relations()
 
@@ -866,7 +956,7 @@ local function Differential()
 		)
 	)
 	asnip(s({ trig = ".p", hidden = true }, { t("∂ _( "), i(1), t(" )") }, { condition = mathZone }))
-	switchsnip({ "∂ _( ", "∂ /( ∂ " })
+	switchSnip({ "∂ _( ", "∂ /( ∂ " })
 end
 Differential()
 
