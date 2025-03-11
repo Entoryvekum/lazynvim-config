@@ -44,6 +44,11 @@ local function plainText()
 	end
 end
 
+local mathOptShow = { hidden = true, wordTrig = false, condition = mathZone }
+local mathOptHide = { hidden = false, wordTrig = false, condition = mathZone }
+local mathOptShowAuto = { hidden = true, wordTrig = false, condition = mathZone, auto = true }
+local mathOptHideAuto = { hidden = false, wordTrig = false, condition = mathZone, auto = true }
+
 local function snip(val)
 	table.insert(snippets, val)
 end
@@ -53,6 +58,10 @@ local function asnip(val)
 end
 
 local function switchSnip(arr, opts)
+	-- Example: { "θ", "ϑ", "Θ" }
+	if opts == nil then
+		opts = {}
+	end
 	for j = 1, #arr do
 		opts.trig = arr[j]
 		if j == #arr then
@@ -64,8 +73,14 @@ local function switchSnip(arr, opts)
 end
 
 local function transferSnip(arr, opts)
-	for k1, v1 in ipairs(arr) do
-		for k2, v2 in ipairs(arr) do
+	-- Example:
+	-- {
+	--    { "⋯", "h" },
+	-- 	  { "⋱", "d" },
+	-- 	  { "⋰", "u" },
+	-- }
+	for k1, v1 in pairs(arr) do
+		for k2, v2 in pairs(arr) do
 			if k1 ~= k2 then
 				opts.trig = v2[1] .. v1[2]
 				asnip(s(opts, { t(v1[1]) }))
@@ -74,62 +89,102 @@ local function transferSnip(arr, opts)
 	end
 end
 
-local function linkSnip(arr, opts)
-	local prev
-	for k, v in ipairs(arr) do
-		if prev == nil then
-			prev = v
-		else
-			local addSnip = v.auto and asnip or snip
-			v.trig = prev .. v[1]
-			for optName, optVal in ipairs(opts) do
-				if v[optName] == nil then
-					v[optName] = optVal
+local function orderSnip(arr, opts)
+	-- Example
+	-- {
+	--     {"<",{","},{{",","."}}},
+	--     {">",{"."},{{",","."}}},
+	--     {"≮",{","},{{",","."}}},
+	--     {"≯",{"."},{{",","."}}},
+	--     {"≤",{",","e"},{{",","."}}},
+	--     {"≥",{".","e"},{{",","."}}},
+	--     {"≰",{",","e","n"},{{",","."}}},
+	--     {"≱",{".","e","n"},{{",","."}}},
+	-- }
+	-- { { <target>, <attributes>, {<alt_class1>,<alt_class2>,...} },...}
+	local addSnip = opts.auto and asnip or snip
+
+	for _, v in pairs(arr) do
+		local tmp = {}
+		for _, w in pairs(v[2]) do
+			tmp[w] = true
+		end
+		v.numAttr = #v[2]
+		v[2] = tmp
+		if v[3] == nil then
+			v[3] = {}
+		end
+	end
+	for k1, trgt in pairs(arr) do
+		for k2, from in pairs(arr) do
+			if k1 ~= k2 and trgt.cls == from.cls then
+				local tmp = nil
+				for k, _ in pairs(trgt[2]) do
+					if from[2][k] == nil then
+						tmp = tmp == nil and k or false
+					end
+				end
+				if tmp and from.numAttr + 1 == trgt.numAttr then
+					opts.trig = from[1] .. tmp
+					addSnip(s(opts, { t(trgt[1]) }))
+				end
+				for _, alts in pairs(trgt[3]) do
+					for _, alt1 in pairs(alts) do
+						if trgt[2][alt1] then
+							for _, alt2 in pairs(alts) do
+								if alt1 ~= alt2 then
+									trgt[2][alt1] = nil
+									trgt[2][alt2] = true
+									tmp = true
+									for k, _ in pairs(trgt[2]) do
+										if from[2][k] == nil then
+											tmp = false
+										end
+									end
+									if tmp and from.numAttr == trgt.numAttr then
+										opts.trig = from[1] .. alt1
+										addSnip(s(opts, { t(trgt[1]) }))
+									end
+									trgt[2][alt1] = true
+									trgt[2][alt2] = nil
+								end
+							end
+						end
+					end
 				end
 			end
-			addSnip(s(v, { t(v[2]) }))
 		end
 	end
 end
 
-local function simpleSnip(alpha, defaultType, opts)
-	if defaultType == nil or (defaultType ~= "a" and defaultType ~= "n") then
-		defaultType = "n"
-	end
-
-	local isauto = function(x)
-		if defaultType == "n" then
-			return x == "a"
-		else
-			return x ~= "n"
-		end
-	end
-
-	local addSnip
-	for k, v in ipairs(alpha) do
-		if isauto(v[3].auto) then
-			addSnip = asnip
-		else
-			addSnip = snip
-		end
-		local curOpts = v[3]
-		for optName, optVal in ipairs(opts) do
+local function simpleSnip(arr, opts)
+	-- Example:
+	-- {
+	--     { "and;", "∧" },
+	--     { "or;", "∨" },
+	--     { "cup;", { "∪", "⊔" } },
+	--     { "cap;", { "∩", "⨅" } },
+	--     { "<n", "≮", {auto=false} },
+	--     { "≤n", "≰", {auto=false} },
+	-- }
+	for _, v in pairs(arr) do
+		local curOpts = v[3] and v[3] or {}
+		local addSnip
+		for optName, optVal in pairs(opts) do
 			if curOpts[optName] == nil then
 				curOpts[optName] = optVal
 			end
 		end
 		curOpts.trig = v[1]
+		addSnip = curOpts.auto and asnip or snip
 		if type(v[2]) == "table" then
 			addSnip(s(curOpts, { t(v[2][1]) }))
-			switchSnip(v[2])
+			switchSnip(v[2], mathOptShow)
 		else
 			addSnip(s(curOpts, { t(v[2]) }))
 		end
 	end
 end
-
-local mathOptShow = { hidden = true, wordTrig = false, condition = mathZone }
-local mathOptHide = { hidden = false, wordTrig = false, condition = mathZone }
 
 ----------------------------------测试--------------------------------
 local function tests()
@@ -259,7 +314,7 @@ MathEnvironment()
 
 --普通符号
 local function Symbols()
-	local alpha = {
+	local arr = {
 		{ "oo;", "∞" },
 		{ "qed;", "∎" },
 		{ "rf;", "∀" },
@@ -272,13 +327,13 @@ local function Symbols()
 		{ "par;", "∂" },
 		{ "|m", "mid(|)" },
 	}
-	simpleSnip(alpha, "a", mathOptHide)
+	simpleSnip(arr, mathOptHideAuto)
 end
 Symbols()
 
 --积分
 local function Integrals()
-	local alpha = {
+	local arr = {
 		{ "int;", "∫" },
 		{ "∫i", "∬" },
 		{ "∬i", "∭" },
@@ -288,13 +343,13 @@ local function Integrals()
 		{ "∬o", "∯" },
 		{ "∭o", "∰" },
 	}
-	simpleSnip(alpha, "a", mathOptHide)
+	simpleSnip(arr, mathOptHideAuto)
 end
 Integrals()
 
 --希腊字母
 local function GreekLetters()
-	local alpha = {
+	local arr = {
 		{ "a", { "α", "Α" } },
 		{ "b", { "β", "Β" } },
 		{ "g", { "γ", "Γ" } },
@@ -321,33 +376,31 @@ local function GreekLetters()
 		{ "og", { "ω", "Ω" } },
 	}
 
-	for k, v in ipairs(alpha) do
-		asnip(s({ trig = "'" .. v[1], condition = mathZone }, { t(v[2][1]) }))
+	for k, v in pairs(arr) do
+		asnip(s({ trig = "\\" .. v[1], condition = mathZone }, { t(v[2][1]) }))
 		asnip(s({
-			trig = "'" .. string.upper(string.sub(v[1], 1, 1)) .. string.sub(v[1], 2),
+			trig = "\\" .. string.upper(string.sub(v[1], 1, 1)) .. string.sub(v[1], 2),
 			condition = mathZone,
 		}, { t(v[2][#v[2]]) }))
-		switchSnip(v[2])
+		switchSnip(v[2], mathOptShow)
 	end
 end
 GreekLetters()
 
 --大型运算符
 local function BigOperators()
-	local alpha1 =
+	local arr1 =
 		{ "sum", "prod", "coprod", "plusc", "timec", "bcdot", "bcup", "bcupf", "bcupj", "bcap", "bcapf", "band", "bor" }
-	local alpha2 = { "∑", "∏", "∐", "⨁", "⨂", "⨀", "⋃", "⨆", "⨄", "⋂", "⨅", "⋀", "⋁" }
-	for j = 1, #alpha1 do
-		snip(
-			s({ trig = alpha1[j], condition = mathZone }, { t(alpha2[j] .. " _( "), i(1), t(" ) ^( "), i(2), t(" ) ") })
-		)
+	local arr2 = { "∑", "∏", "∐", "⨁", "⨂", "⨀", "⋃", "⨆", "⨄", "⋂", "⨅", "⋀", "⋁" }
+	for j = 1, #arr1 do
+		snip(s({ trig = arr1[j], condition = mathZone }, { t(arr2[j] .. " _( "), i(1), t(" ) ^( "), i(2), t(" ) ") }))
 		snip(s({
-			trig = alpha1[j] .. " (%w|[^!-`][^%s]*) (%w|[^!-`][^%s]*) (%w|[^!-`][^%s]*)",
+			trig = arr1[j] .. " (%w|[^!-`][^%s]*) (%w|[^!-`][^%s]*) (%w|[^!-`][^%s]*)",
 			hidden = true,
 			trigEngine = "pattern",
 			condition = mathZone,
 		}, {
-			t(alpha2[j] .. " _( "),
+			t(arr2[j] .. " _( "),
 			f(function(arg, snip, userArg)
 				return snip.captures[1]
 			end, {}, {}),
@@ -361,8 +414,8 @@ local function BigOperators()
 			end, {}, {}),
 			t(" ) "),
 		}))
-		asnip(s({ trig = alpha1[j] .. ";(.)", hidden = true, trigEngine = "pattern", condition = mathZone }, {
-			t(alpha2[j] .. " _( "),
+		asnip(s({ trig = arr1[j] .. ";(.)", hidden = true, trigEngine = "pattern", condition = mathZone }, {
+			t(arr2[j] .. " _( "),
 			f(function(arg, snip, userArg)
 				return snip.captures[1]
 			end, {}, {}),
@@ -389,8 +442,10 @@ local function Operators()
 		{ "..", { "⋅", "•" } },
 		{ "⋅.", "⋯" },
 		{ "cir;", { "∘", "⚬" } },
+
 		{ "and;", "∧" },
 		{ "or;", "∨" },
+
 		{ "cup;", { "∪", "⊔" } },
 		{ "cap;", { "∩", "⨅" } },
 		{ "ni;", "∖" },
@@ -401,142 +456,104 @@ local function Operators()
 		{ "⋰", "u" },
 	}
 	transferSnip(trans, mathOptHide)
-	simpleSnip(arr, "a", mathOptShow)
+	simpleSnip(arr, mathOptShowAuto)
 end
 Operators()
 
 --关系符
 local function Relations()
 	local arr1 = {
+		{ "<", { "," }, { { ",", "." } } },
+		{ ">", { "." }, { { ",", "." } } },
+		{ "≮", { ",", "n" }, { { ",", "." } } },
+		{ "≯", { ".", "n" }, { { ",", "." } } },
+		{ "≤", { ",", "e" }, { { ",", "." } } },
+		{ "≥", { ".", "e" }, { { ",", "." } } },
+		{ "≰", { ",", "e", "n" }, { { ",", "." } } },
+		{ "≱", { ".", "e", "n" }, { { ",", "." } } },
+
+		{ "⊲", { ",", "t" }, { { ",", "." } } },
+		{ "⊳", { ".", "t" }, { { ",", "." } } },
+		{ "⋪", { ",", "e", "n" }, { { ",", "." } } },
+		{ "⋫", { ".", "e", "n" }, { { ",", "." } } },
+		{ "⊴", { ",", "t", "e" }, { { ",", "." } } },
+		{ "⊵", { ".", "t", "e" }, { { ",", "." } } },
+		{ "⋬", { ",", "t", "e", "n" }, { { ",", "." } } },
+		{ "⋭", { ".", "t", "e", "n" }, { { ",", "." } } },
+
+		{ "≺", { ",", "c" }, { { ",", "." } } },
+		{ "≻", { ".", "c" }, { { ",", "." } } },
+		{ "⊀", { ",", "c", "n" }, { { ",", "." } } },
+		{ "⊁", { ".", "c", "n" }, { { ",", "." } } },
+		{ "≼", { ",", "c", "e" }, { { ",", "." } } },
+		{ "≽", { ".", "c", "e" }, { { ",", "." } } },
+		{ "⋠", { ",", "c", "e", "n" }, { { ",", "." } } },
+		{ "⋡", { ".", "c", "e", "n" }, { { ",", "." } } },
+	}
+	orderSnip(arr1, mathOptShowAuto)
+
+	local arr2 = {
+		{ "∈", { "." }, { { ",", "." } } },
+		{ "∋", { "," }, { { ",", "." } } },
+		{ "∉", { ".", "n" }, { { ",", "." } } },
+		{ "∌", { ",", "n" }, { { ",", "." } } },
+	}
+	orderSnip(arr2, mathOptShowAuto)
+
+	local arr3 = {
+		{ "⊂", { "." }, { { ",", "." } } },
+		{ "⊃", { "," }, { { ",", "." } } },
+		{ "⊄", { ".", "n" }, { { ",", "." } } },
+		{ "⊅", { ",", "n" }, { { ",", "." } } },
+		{ "⊆", { ".", "e" }, { { ",", "." } } },
+		{ "⊇", { ",", "e" }, { { ",", "." } } },
+		{ "⊊", { ".", "e", "n" }, { { ",", "." } } },
+		{ "⊋", { ",", "e", "n" }, { { ",", "." } } },
+	}
+	orderSnip(arr3, mathOptShowAuto)
+	switchSnip({ "⊊", "⊈" }, mathOptShow)
+	switchSnip({ "⊋", "⊉" }, mathOptShow)
+
+	local other = {
+		{ "in;", "∈" },
+		{ "sub;", "⊂" },
+		{ "sup;", "⊃" },
+
+		{ "sim", "〜" },
+		{ "prop;", "∝" },
+
+		{ "div;", "∣" },
+		{ "∣n", "∤" },
+
+		{ "join", "⨝" },
+		{ "⨝,", "⟕" },
+		{ "⨝.", "⟖" },
+		{ "⟕.", "⟗" },
+		{ "⟖,", "⟗" },
+	}
+	simpleSnip(other, mathOptShowAuto)
+
+	local eq = {
 		{ "ee;", "=" },
 		{ "ne;", "≠" },
 		{ "eee", "≡" },
 		{ "≡n", "≢" },
 		{ "≢n", "≡" },
 		{ "eeee", "≣" },
-		{ ".e", "≥" },
-	}
-	simpleSnip(arr1, "a", mathOptShow)
-	local arr2 = {
 
-		{ ".e", "≥" },
-		{ ">n", "≯" },
-		{ "≥n", "≱" },
-		{ ">t", "⊳" },
-		{ "⊳e", "⊵" },
-		{ "⊳n", "⋫" },
-		{ "⋫,", "⋪" },
-		{ "⋫e", "⋭" },
-		{ "⋭,", "⋬" },
-		{ "⊵n", "⋭" },
-	}
-	switchSnip({ { "<", "," }, { ">", "." } }, mathOptHide)
-	switchSnip({ { "≮", "," }, { "≯", "." } }, mathOptHide)
-	switchSnip({ { "≤", "," }, { "≥", "." } }, mathOptHide)
-	switchSnip({ { "≰", "," }, { "≱", "." } }, mathOptHide)
-	switchSnip({ { "≰", "," }, { "≱", "." } }, mathOptHide)
-	switchSnip({ { "≰", "," }, { "≱", "." } }, mathOptHide)
-	switchSnip({ { "⊲", "," }, { "⊳", "." } }, mathOptHide)
-	switchSnip({ { "⊴", "," }, { "⊵", "." } }, mathOptHide)
-	switchSnip({ { "⊴", "," }, { "⊵", "." } }, mathOptHide)
-	local arr3 = {
-		{ ">c", "≻" },
-		{ "≻,", "≺" },
-		{ "≻e", "≽" },
-		{ "≽,", "≼" },
-		{ "≻n", "⊁" },
-		{ "⊁,", "⊀" },
-		{ "⊁n", "⋡" },
-		{ "⋡,", "⋠" },
-		{ "≽n", "⋡" },
-
-		{ "<.", ">" },
-		{ ",e", "≤" },
-		{ "≤.", "≥" },
-		{ "<n", "≮", "n" },
-		{ "≮.", "≯" },
-		{ "≤n", "≰", "n" },
-		{ "≰.", "≱" },
-
-		{ "<t", "⊲" },
-		{ "⊲.", "⊳" },
-		{ "⊲e", "⊴" },
-		{ "⊴.", "⊵" },
-		{ "⊲n", "⋪" },
-		{ "⋪.", "⋫" },
-		{ "⋪e", "⋬" },
-		{ "⋬.", "⋭" },
-		{ "⊴n", "⋬" },
-
-		{ "<c", "≺" },
-		{ "≺.", "≻" },
-		{ "≺e", "≼" },
-		{ "≼.", "≽" },
-		{ "≺n", "⊀" },
-		{ "⊀.", "⊁" },
-		{ "⊀c", "⋠" },
-		{ "⋠.", "⋡" },
-		{ "≼n", "⋠" },
-
-		{ "sim", "〜" },
-
-		{ "prop", "∝" },
-
-		{ "vgiu", "∣" },
-		{ "∣n", "∤" },
-
-		{ "in;", "∈" },
-		{ "∈n", "∉" },
-		{ "∉n", "∈" },
-		{ "∋n", "∌" },
-		{ "∌n", "∋" },
-		{ "∈,", "∋" },
-		{ "∉,", "∌" },
-		{ "∋.", "∈" },
-		{ "∌.", "∉" },
-
-		{ "join", "⨝", "n" },
-		{ "⨝,", "⟕" },
-		{ "⨝.", "⟖" },
-		{ "⟕r", "⟗" },
-		{ "⟖l", "⟗" },
-
-		{ "sub;", "⊂" },
-		{ "⊂,", "⊃" },
-		{ "⊂n", "⊄" },
-		{ "⊄n", "⊂" },
-		{ "⊄,", "⊅" },
-		{ "⊂e", "⊆" },
-		{ "⊆,", "⊇" },
-		{ "⊆n", { "⊊", "⊈" } },
-		{ "⊊n", "⊆" },
-		{ "⊈n", "⊆" },
-		{ "⊊,", "⊋" },
-		{ "⊈,", "⊉" },
-		{ "sup;", "⊃" },
-		{ "⊃.", "⊂" },
-		{ "⊃n", "⊅" },
-		{ "⊅.", "⊄" },
-		{ "⊃e", "⊇" },
-		{ "⊇.", "⊆" },
-		{ "⊇n", { "⊋", "⊉" } },
-		{ "⊋n", "⊇" },
-		{ "⊉n", "⊇" },
-		{ "⊋.", "⊊" },
-		{ "⊉.", "⊈" },
+		{ "se;", "⋍" },
+		{ "⋍n", "≄" },
+		{ "see;", "≅" },
+		{ "≅n", "≇" },
 
 		{ ":=", "≔" },
 		{ "=def", "≝" },
 		{ "=?", "≟" },
-		{ "se;", "⋍" },
-		{ "⋍n", "≄" },
-		{ "≄n", "⋍" },
-		{ "see;", "≅" },
-		{ "≅n", "≇" },
-		{ "≇n", "≅" },
+
+		{ ",e", "≤" },
+		{ ".e", "≥" },
 	}
-	simpleSnip(alpha, "a", { hidden = true, wordTrig = false, condition = mathZone })
-	switchSnip({})
+	simpleSnip(eq, mathOptShowAuto)
 end
 Relations()
 
@@ -579,9 +596,9 @@ local function Arrows()
 
 			if #alpha[k][3] - #alpha[j][3] == 1 and alpha[j][2] == alpha[k][2] then
 				local miss = 0
-				for k1, v1 in ipairs(alpha[k][3]) do
+				for k1, v1 in pairs(alpha[k][3]) do
 					local flag = true
-					for k2, v2 in ipairs(alpha[j][3]) do
+					for k2, v2 in pairs(alpha[j][3]) do
 						if v1 == v2 then
 							flag = false
 							break
@@ -1129,7 +1146,7 @@ local function Hats()
 		{ "vv", "ubold" },
 		{ "uc", "circle" },
 	}
-	for k, v in ipairs(alpha) do
+	for k, v in pairs(alpha) do
 		addSnip(v[1], v[2], v[3])
 	end
 end
