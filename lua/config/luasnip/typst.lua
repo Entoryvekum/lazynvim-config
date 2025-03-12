@@ -389,18 +389,29 @@ GreekLetters()
 
 --大型运算符
 local function BigOperators()
-	local arr1 =
-		{ "sum", "prod", "coprod", "plusc", "timec", "bcdot", "bcup", "bcupf", "bcupj", "bcap", "bcapf", "band", "bor" }
-	local arr2 = { "∑", "∏", "∐", "⨁", "⨂", "⨀", "⋃", "⨆", "⨄", "⋂", "⨅", "⋀", "⋁" }
-	for j = 1, #arr1 do
-		snip(s({ trig = arr1[j], condition = mathZone }, { t(arr2[j] .. " _( "), i(1), t(" ) ^( "), i(2), t(" ) ") }))
+	local arr= {
+		{ "sum","∑"},
+		{ "prod","∏"},
+		{ "coprod","∐"},
+		{ "plusc","⨁"},
+		{ "timec","⨂"},
+		{ "bdotc","⨀"},
+		{ "bcup","⋃"},
+		{ "bcups","⨆"},
+		{ "bcap","⋂"},
+		{ "bcaps","⨅"},
+		{ "band","⋀"},
+		{ "bor", "⋁"},
+	}
+	for _,v in pairs(arr) do
+		snip(s({ trig = v[1], condition = mathZone }, { t(v[2] .. " _( "), i(1), t(" ) ^( "), i(2), t(" ) ") }))
 		snip(s({
-			trig = arr1[j] .. " (%w|[^!-`][^%s]*) (%w|[^!-`][^%s]*) (%w|[^!-`][^%s]*)",
+			trig = v[1] .. " (%w|[^!-`][^%s]*) (%w|[^!-`][^%s]*) (%w|[^!-`][^%s]*)",
 			hidden = true,
 			trigEngine = "pattern",
 			condition = mathZone,
 		}, {
-			t(arr2[j] .. " _( "),
+			t(v[2] .. " _( "),
 			f(function(arg, snip, userArg)
 				return snip.captures[1]
 			end, {}, {}),
@@ -414,8 +425,8 @@ local function BigOperators()
 			end, {}, {}),
 			t(" ) "),
 		}))
-		asnip(s({ trig = arr1[j] .. ";(.)", hidden = true, trigEngine = "pattern", condition = mathZone }, {
-			t(arr2[j] .. " _( "),
+		asnip(s({ trig = v[1] .. ";(.)", hidden = true, trigEngine = "pattern", condition = mathZone }, {
+			t(v[2] .. " _( "),
 			f(function(arg, snip, userArg)
 				return snip.captures[1]
 			end, {}, {}),
@@ -462,6 +473,47 @@ Operators()
 
 --关系符
 local function Relations()
+	local other = {
+		{ "in;", "∈" },
+		{ "sub;", "⊂" },
+		{ "sup;", "⊃" },
+
+		{ "sim", "〜" },
+		{ "prop;", "∝" },
+
+		{ "div;", "∣" },
+		{ "∣n", "∤" },
+
+		{ "join", "⨝" },
+		{ "⨝,", "⟕" },
+		{ "⨝.", "⟖" },
+		{ "⟕.", "⟗" },
+		{ "⟖,", "⟗" },
+	}
+	simpleSnip(other, mathOptShowAuto)
+
+	local eq = {
+		{ "ee;", "=" },
+		{ "ne;", "≠" },
+		{ "eee", "≡" },
+		{ "≡n", "≢" },
+		{ "≢n", "≡" },
+		{ "eeee", "≣" },
+
+		{ "se;", "⋍" },
+		{ "⋍n", "≄" },
+		{ "see;", "≅" },
+		{ "≅n", "≇" },
+
+		{ ":=", "≔" },
+		{ "=def", "≝" },
+		{ "=?", "≟" },
+
+		{ ",e", "≤" },
+		{ ".e", "≥" },
+	}
+	simpleSnip(eq, mathOptShowAuto)
+
 	local arr1 = {
 		{ "<", { "," }, { { ",", "." } } },
 		{ ">", { "." }, { { ",", "." } } },
@@ -509,57 +561,24 @@ local function Relations()
 		{ "⊇", { ",", "e" }, { { ",", "." } } },
 		{ "⊊", { ".", "e", "n" }, { { ",", "." } } },
 		{ "⊋", { ",", "e", "n" }, { { ",", "." } } },
+		{ "⊏", { ".", "s" }, { { ",", "." } } },
+		{ "⊐", { ",", "s" }, { { ",", "." } } },
+		{ "⊑", { ".", "s", "e" }, { { ",", "." } } },
+		{ "⊒", { ",", "s", "e" }, { { ",", "." } } },
+		{ "⋤", { ".", "s", "e", "n" }, { { ",", "." } } },
+		{ "⋥", { ",", "s", "e", "n" }, { { ",", "." } } },
 	}
 	orderSnip(arr3, mathOptShowAuto)
 	switchSnip({ "⊊", "⊈" }, mathOptShow)
 	switchSnip({ "⊋", "⊉" }, mathOptShow)
-
-	local other = {
-		{ "in;", "∈" },
-		{ "sub;", "⊂" },
-		{ "sup;", "⊃" },
-
-		{ "sim", "〜" },
-		{ "prop;", "∝" },
-
-		{ "div;", "∣" },
-		{ "∣n", "∤" },
-
-		{ "join", "⨝" },
-		{ "⨝,", "⟕" },
-		{ "⨝.", "⟖" },
-		{ "⟕.", "⟗" },
-		{ "⟖,", "⟗" },
-	}
-	simpleSnip(other, mathOptShowAuto)
-
-	local eq = {
-		{ "ee;", "=" },
-		{ "ne;", "≠" },
-		{ "eee", "≡" },
-		{ "≡n", "≢" },
-		{ "≢n", "≡" },
-		{ "eeee", "≣" },
-
-		{ "se;", "⋍" },
-		{ "⋍n", "≄" },
-		{ "see;", "≅" },
-		{ "≅n", "≇" },
-
-		{ ":=", "≔" },
-		{ "=def", "≝" },
-		{ "=?", "≟" },
-
-		{ ",e", "≤" },
-		{ ".e", "≥" },
-	}
-	simpleSnip(eq, mathOptShowAuto)
+	switchSnip({ "⋤", "⋢" }, mathOptShow)
+	switchSnip({ "⋥", "⋣" }, mathOptShow)
 end
 Relations()
 
 --箭头
 local function Arrows()
-	local alpha = {
+	local arr = {
 		-- l r u d lr ud
 		-- e: 双线箭头 s: 三/四线箭头
 		-- b: 左侧竖线 t: 右侧竖线
@@ -588,17 +607,17 @@ local function Arrows()
 	asnip(s({ trig = "a,.", hidden = true }, { t("⇔") }, { condition = mathZone }))
 	snip(s({ trig = "map", hidden = false }, { t("↦") }, { condition = mathZone }))
 
-	for j = 1, #alpha do
-		for k = 1, #alpha do
-			if j == k or #alpha[k][3] <= #alpha[j][3] or #alpha[k][3] - #alpha[j][3] > 1 then
+	for j = 1, #arr do
+		for k = 1, #arr do
+			if j == k or #arr[k][3] <= #arr[j][3] or #arr[k][3] - #arr[j][3] > 1 then
 				goto continue
 			end
 
-			if #alpha[k][3] - #alpha[j][3] == 1 and alpha[j][2] == alpha[k][2] then
+			if #arr[k][3] - #arr[j][3] == 1 and arr[j][2] == arr[k][2] then
 				local miss = 0
-				for k1, v1 in pairs(alpha[k][3]) do
+				for k1, v1 in pairs(arr[k][3]) do
 					local flag = true
-					for k2, v2 in pairs(alpha[j][3]) do
+					for k2, v2 in pairs(arr[j][3]) do
 						if v1 == v2 then
 							flag = false
 							break
@@ -612,7 +631,7 @@ local function Arrows()
 						end
 					end
 				end
-				asnip(s({ trig = alpha[j][1] .. miss, hidden = true }, { t(alpha[k][1]) }, { condition = mathZone }))
+				asnip(s({ trig = arr[j][1] .. miss, hidden = true }, { t(arr[k][1]) }, { condition = mathZone }))
 			end
 
 			::continue::
