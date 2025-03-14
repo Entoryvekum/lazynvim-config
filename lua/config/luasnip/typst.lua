@@ -422,16 +422,16 @@ local function BigOperators()
 			condition = mathZone,
 		}, {
 			t(v[2] .. " _( "),
-			f(function(arg, snip, userArg)
-				return snip.captures[1]
+			f(function(arg, parent, userArg)
+				return parent.captures[1]
 			end, {}, {}),
 			t(" = "),
-			f(function(arg, snip, userArg)
-				return snip.captures[2]
+			f(function(arg, parent, userArg)
+				return parent.captures[2]
 			end, {}, {}),
 			t(" ) ^( "),
-			f(function(arg, snip, userArg)
-				return snip.captures[3]
+			f(function(arg, parent, userArg)
+				return parent.captures[3]
 			end, {}, {}),
 			t(" ) "),
 		}))
@@ -447,7 +447,7 @@ BigOperators()
 --运算符
 local function Operators()
 	local arr = {
-		{ "aa;", "+" },
+		{ "aa", "+" },
 		{ "tt;", "×" },
 		{ "×l", "⋉" },
 		{ "×r", "⋊" },
@@ -638,12 +638,12 @@ local function Binomial()
 
 	snip(s({ trig = "bin ([^%s]*) ([^%s]*)%s*", trigEngine = "pattern", hidden = true, condition = mathZone }, {
 		t("binom ( "),
-		f(function(arg, snip, userArg)
-			return snip.captures[1]
+		f(function(arg, parent, userArg)
+			return parent.captures[1]
 		end, {}),
 		t(" , "),
-		f(function(arg, snip, userArg)
-			return snip.captures[2]
+		f(function(arg, parent, userArg)
+			return parent.captures[2]
 		end, {}),
 		t(" ) "),
 	}))
@@ -808,8 +808,8 @@ local function Root()
 			{ trig = "sqrt;([^%s])", wordTrig = false, hidden = true, trigEngine = "pattern",condition = mathZone },
 			{ 
                 t("sqrt( "), 
-                f(function(arg, snip, userArg)
-                    return snip.captures[1]
+                f(function(arg, parent, userArg)
+                    return parent.captures[1]
                 end, {}),
                 i(1),
                 t(" ) ")
@@ -820,9 +820,9 @@ local function Root()
 		t("root( "),
 		i(2),
 		t(" , "),
-		d(1, function(arg, snip, oldState, userArg)
-			if #snip.env.SELECT_RAW > 0 then
-				return sn(nil, { t(snip.env.SELECT_RAW) })
+		d(1, function(arg, parent, oldState, userArg)
+			if #parent.env.SELECT_RAW > 0 then
+				return sn(nil, { t(parent.env.SELECT_RAW) })
 			else
 				return sn(nil, { i(1) })
 			end
@@ -833,8 +833,8 @@ local function Root()
 		t("root( "),
 		i(2),
 		t(" , "),
-		f(function(arg, snip, userArg)
-			return snip.captures[1]
+		f(function(arg, parent, userArg)
+			return parent.captures[1]
 		end, {}),
 		i(1),
 		t(" ) "),
@@ -863,8 +863,8 @@ local function UnderOverContent()
 		}))
 		asnip(s({ trig = name .. key .. "([^%s])", hidden = true, trigEngine = "pattern", condition = mathZone }, {
 			t(effect .. "( "),
-			f(function(arg, snip, userArg)
-				return snip.captures[1]
+			f(function(arg, parent, userArg)
+				return parent.captures[1]
 			end, {}),
 			i(1),
 			t(" , "),
@@ -882,48 +882,48 @@ UnderOverContent()
 --序列
 local function Sequence()
 	snip(s({ trig = "seq (%w[^%s]*)%s+(%w[^%s]*)%s+(%w[^%s]*)", hidden = true, trigEngine = "pattern" }, {
-		f(function(arg, snip, userArg)
-			return snip.captures[1] .. "_( " .. snip.captures[2] .. " ) , " .. snip.captures[1] .. "_( "
+		f(function(arg, parent, userArg)
+			return parent.captures[1] .. "_( " .. parent.captures[2] .. " ) , " .. parent.captures[1] .. "_( "
 		end, {}),
-		f(function(arg, snip, userArg)
-			if tonumber(snip.captures[2], 10) == nil then
-				return snip.captures[2] .. "+1"
+		f(function(arg, parent, userArg)
+			if tonumber(parent.captures[2], 10) == nil then
+				return parent.captures[2] .. "+1"
 			end
-			return tostring(snip.captures[2] + 1)
+			return tostring(parent.captures[2] + 1)
 		end, {}),
 		t(" ) , ⋯ "),
-		f(function(arg, snip, userArg)
-			if snip.captures[3] == "inf" then
+		f(function(arg, parent, userArg)
+			if parent.captures[3] == "inf" then
 				return ""
 			end
-			return ", " .. snip.captures[1] .. "_( " .. snip.captures[3] .. " ) "
+			return ", " .. parent.captures[1] .. "_( " .. parent.captures[3] .. " ) "
 		end, {}),
 	}, { condition = mathZone }))
 	snip(s({ trig = "seq (%w[^%s]*)%s+(%w[^%s]*)%s+(%w[^%s]*)%s+([^%s]+)", hidden = true, trigEngine = "pattern" }, {
-		f(function(arg, snip, userArg)
-			return snip.captures[1]
+		f(function(arg, parent, userArg)
+			return parent.captures[1]
 				.. "_( "
-				.. snip.captures[2]
+				.. parent.captures[2]
 				.. " ) "
-				.. snip.captures[4]
+				.. parent.captures[4]
 				.. " "
-				.. snip.captures[1]
+				.. parent.captures[1]
 				.. "_( "
 		end, {}),
-		f(function(arg, snip, userArg)
-			if tonumber(snip.captures[2], 10) == nil then
-				return snip.captures[2] .. "+1"
+		f(function(arg, parent, userArg)
+			if tonumber(parent.captures[2], 10) == nil then
+				return parent.captures[2] .. "+1"
 			end
-			return tostring(snip.captures[2] + 1)
+			return tostring(parent.captures[2] + 1)
 		end, {}),
-		f(function(arg, snip, userArg)
-			return " ) " .. snip.captures[4] .. " ⋯ "
+		f(function(arg, parent, userArg)
+			return " ) " .. parent.captures[4] .. " ⋯ "
 		end, {}),
-		f(function(arg, snip, userArg)
-			if snip.captures[3] == "inf" then
+		f(function(arg, parent, userArg)
+			if parent.captures[3] == "inf" then
 				return ""
 			end
-			return snip.captures[4] .. " " .. snip.captures[1] .. "_( " .. snip.captures[3] .. " ) "
+			return parent.captures[4] .. " " .. parent.captures[1] .. "_( " .. parent.captures[3] .. " ) "
 		end, {}),
 	}, { condition = mathZone }))
 end
@@ -933,19 +933,19 @@ Sequence()
 local function Differential()
 	asnip(s({ trig = "[dp];(%w[^/%s]*)/", hidden = true, trigEngine = "pattern" }, {
 		t("( "),
-		f(function(arg, snip, userArg)
-			if snip.captures[2] == "d" then
+		f(function(arg, parent, userArg)
+			if parent.captures[2] == "d" then
 				return "d "
 			else
 				return "∂ "
 			end
 		end, {}),
-		f(function(arg, snip, userArg)
-			return snip.captures[1]
+		f(function(arg, parent, userArg)
+			return parent.captures[1]
 		end, {}),
 		t(" )/( "),
-		f(function(arg, snip, userArg)
-			if snip.captures[2] == "d" then
+		f(function(arg, parent, userArg)
+			if parent.captures[2] == "d" then
 				return "d "
 			else
 				return "∂ "
