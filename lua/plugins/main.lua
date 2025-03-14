@@ -79,6 +79,7 @@ local mainConf = {
 			enable_autosnippets = true,
 			store_selection_keys = "<tab>",
 		},
+		build = "make install_jsregexp",
 		init = function()
 			require("luasnip.loaders.from_lua").load({ paths = "./lua/config/luasnip/" })
 		end,

@@ -29,19 +29,25 @@ local key = require("luasnip.nodes.key_indexer").new_key
 local snippets, autosnippets = {}, {}
 
 local function mathZone()
-	if vim.treesitter.get_node():type() == "math" then
-		return true
-	else
-		return false
-	end
+    local cur=vim.treesitter.get_node()
+    local root=cur:tree():root()
+    local flag=false
+    local arr={content=true,string=true}
+    while true do
+        if cur:type()=="math" then
+            flag=true
+            break
+        elseif arr[cur:type()] or cur==root then
+            break
+        else
+            cur=cur:parent()
+        end
+    end
+    return flag
 end
 
 local function plainText()
-	if vim.treesitter.get_node():type() ~= "math" then
-		return true
-	else
-		return false
-	end
+    return (not mathZone()) or vim.treesitter.get_node():root():has_error()
 end
 
 local mathOptShow = { hidden = true, wordTrig = false, condition = mathZone }
@@ -207,6 +213,19 @@ local function tests()
 		s("test:insert", { i(2, ">>>insert 1<<<"), t(" "), sn(1, { i(1, ">>>insert 2<<<") }), i(3, ">>>insert 3<<<") })
 	snip(test2)
 
+    local test3 = s("test:function", {
+		t("<1: "),
+		i(1),
+		t(">"),
+		f(function(arg, parent, userarg)
+			return arg[1][1] .. arg[2][1]
+		end, { 1, 2 }, {}),
+		t("<2: "),
+		i(2),
+		t(">"),
+	})
+	snip(test3)
+
 	local function recursiveprint(x, n, m) --n: 最大层数
 		if m == nil then
 			m = 1
@@ -238,20 +257,7 @@ local function tests()
 		else
 			return "<" .. tostring(x) .. ">"
 		end
-	end
-
-	local test3 = s("test:function", {
-		t("<1: "),
-		i(1),
-		t(">"),
-		f(function(arg, parent, userarg)
-			return arg[1][1] .. arg[2][1]
-		end, { 1, 2 }, {}),
-		t("<2: "),
-		i(2),
-		t(">"),
-	})
-	snip(test3)
+	end	
 
 	local test4data = {
 		t("<"),
@@ -265,46 +271,38 @@ local function tests()
 		s("test:print", { test4data[1], test4data[2], test4data[3], test4data[4], t(recursiveprint(test4data)) })
 	snip(test4)
 
-	local test5 = s("test:printparent1", {
+	local test5 = s("test:printparent", {
 		f(function(arg, parent, userarg)
 			return recursiveprint(parent, 3)
 		end, {}, {}),
 	})
 	snip(test5)
 
-	local test6 = s("test:printparent2", {
-		sn(1, {
-			f(function(arg, parent, userarg)
-				return recursiveprint(parent, 3)
-			end, {}, {}),
-		}),
-	})
-	snip(test6)
-
-	local test7 = s("test:argi", {
-		i(1),
-		t(": "),
-		f(function(arg, parent, userarg)
-			return recursiveprint(arg)
-		end, { 1 }, {}),
-	})
-	snip(test7)
-
-	local test8 = s("test:argsn", {
-		sn(1, { i(1), t(","), i(2) }),
-		t(": "),
-		f(function(arg, parent, userarg)
-			return recursiveprint(arg)
-		end, { 1 }, {}),
-	})
-	snip(test8)
-
-	local test9 = s("test:ts", {
+	local test6 = s("test:ts", {
 		f(function()
-			return tostring(vim.treesitter.get_node():type())
+            local str=""
+            local cur=vim.treesitter.get_node()
+            local root=cur:tree():root()
+            while true do
+                str= str=="" and tostring(cur:type()) or str.." "..tostring(cur:type())
+                if cur==root then
+                    str=str..tostring(cur:has_error())
+                    break
+                else
+                    cur=cur:parent()
+                end
+            end
+            return str
 		end, {}, {}),
 	})
-	snip(test9)
+	asnip(test6)
+
+    local test7=s({trig="test:ecma([0-9])",trigEngine="ecma"}, {
+        f(function(arg,parent,userArg)
+			return parent.captures
+		end, {}, {}),
+    })
+    snip(test7)
 end
 tests()
 
@@ -418,7 +416,7 @@ local function BigOperators()
 	for _, v in pairs(arr) do
 		snip(s({ trig = v[1], condition = mathZone }, { t(v[2] .. " _( "), i(1), t(" ) ^( "), i(2), t(" ) ") }))
 		snip(s({
-			trig = v[1] .. " (%w|[^!-`][^%s]*) (%w|[^!-`][^%s]*) (%w|[^!-`][^%s]*)",
+			trig = v[1] .. " ([^%s]*) ([^%s]*) ([^%s]*)%s*",
 			hidden = true,
 			trigEngine = "pattern",
 			condition = mathZone,
@@ -437,11 +435,8 @@ local function BigOperators()
 			end, {}, {}),
 			t(" ) "),
 		}))
-		asnip(s({ trig = v[1] .. ";(.)", hidden = true, trigEngine = "pattern", condition = mathZone }, {
+		asnip(s({ trig = v[1] .. ";", hidden = true, condition = mathZone }, {
 			t(v[2] .. " _( "),
-			f(function(arg, snip, userArg)
-				return snip.captures[1]
-			end, {}, {}),
 			i(1),
 			t(" ) "),
 		}))
@@ -493,7 +488,7 @@ local function Relations()
 		{ "sim", "〜" },
 		{ "prop;", "∝" },
 
-		{ "div;", "∣" },
+		{ "divs;", "∣" },
 		{ "∣n", "∤" },
 
 		{ "join", "⨝" },
@@ -624,24 +619,24 @@ Arrows()
 --------------------------------输入--------------------------------
 --分数
 local function Fraction()
-	asnip(s({ trig = "//", hidden = true }, {
-		d(1, function(arg, snip, oldState, userArg)
-			if #snip.env.SELECT_RAW > 0 then
-				return sn(nil, { t("( "), t(snip.env.SELECT_RAW), t(" ) / ( "), i(1), t(" ) ") })
+	asnip(s({ trig = "//", hidden = true, condition = mathZone }, {
+		d(1, function(arg, parent, oldState, userArg)
+			if #parent.env.SELECT_RAW > 0 then
+				return sn(nil, { t("( "), t(parent.env.SELECT_RAW), t(" ) / ( "), i(1), t(" ) ") })
 			else
 				return sn(nil, { t("//") })
 			end
 		end, {}, {}),
-	}, { condition = mathZone }))
-	snip(s({ trig = "/d", hidden = true }, { t("\\/  ") }, { condition = mathZone }))
+	}))
+	snip(s({ trig = "div",condition = mathZone }, { t("\\/  ") }))
 end
 Fraction()
 
 --二项式系数
 local function Binomial()
-	snip(s({ trig = "bin", hidden = true }, { t("binom( "), i(1), t(" ) ") }, { condition = mathZone }))
+	snip(s({ trig = "bin", hidden = false, condition = mathZone }, { t("binom( "), i(1), t(" ) ") }))
 
-	snip(s({ trig = "bin (%w+[^%s]*) ([^%s]*)%s*", regTrig = true, hidden = true }, {
+	snip(s({ trig = "bin ([^%s]*) ([^%s]*)%s*", trigEngine = "pattern", hidden = true, condition = mathZone }, {
 		t("binom ( "),
 		f(function(arg, snip, userArg)
 			return snip.captures[1]
@@ -651,105 +646,105 @@ local function Binomial()
 			return snip.captures[2]
 		end, {}),
 		t(" ) "),
-	}, { condition = mathZone }))
+	}))
 end
 Binomial()
 
 --括号
 local function Brackets()
-	asnip(s({ trig = "jj", wordTrig = false, hidden = true }, {
+	asnip(s({ trig = "jj", wordTrig = false, hidden = true, condition = mathZone }, {
 		t("( "),
-		d(1, function(arg, snip, oldState, userArg)
-			if #snip.env.SELECT_RAW > 0 then
-				return sn(nil, { t(snip.env.SELECT_RAW) })
+		d(1, function(arg, parent, oldState, userArg)
+			if #parent.env.SELECT_RAW > 0 then
+				return sn(nil, { t(parent.env.SELECT_RAW) })
 			else
 				return sn(nil, { i(1) })
 			end
 		end, {}, {}),
 		t(" ) "),
-	}, { condition = mathZone }))
-	snip(s({ trig = "kk", wordTrig = false, hidden = true }, {
+	}))
+	snip(s({ trig = "kk", wordTrig = false, hidden = true, condition = mathZone }, {
 		t("[ "),
-		d(1, function(arg, snip, oldState, userArg)
-			if #snip.env.SELECT_RAW > 0 then
-				return sn(nil, { t(snip.env.SELECT_RAW) })
+		d(1, function(arg, parent, oldState, userArg)
+			if #parent.env.SELECT_RAW > 0 then
+				return sn(nil, { t(parent.env.SELECT_RAW) })
 			else
 				return sn(nil, { i(1) })
 			end
 		end, {}, {}),
 		t(" ] "),
-	}, { condition = mathZone }))
-	snip(s({ trig = "ll", wordTrig = false, hidden = true }, {
+	}))
+	snip(s({ trig = "ll", wordTrig = false, hidden = true, condition = mathZone }, {
 		t("{ "),
-		d(1, function(arg, snip, oldState, userArg)
-			if #snip.env.SELECT_RAW > 0 then
-				return sn(nil, { t(snip.env.SELECT_RAW) })
+		d(1, function(arg, parent, oldState, userArg)
+			if #parent.env.SELECT_RAW > 0 then
+				return sn(nil, { t(parent.env.SELECT_RAW) })
 			else
 				return sn(nil, { i(1) })
 			end
 		end, {}, {}),
 		t(" } "),
-	}, { condition = mathZone }))
-	snip(s({ trig = "bb", hidden = true }, {
+	}))
+	snip(s({ trig = "bb", hidden = true, condition = mathZone }, {
 		t("⟨ "),
-		d(1, function(arg, snip, oldState, userArg)
-			if #snip.env.SELECT_RAW > 0 then
-				return sn(nil, { t(snip.env.SELECT_RAW) })
+		d(1, function(arg, parent, oldState, userArg)
+			if #parent.env.SELECT_RAW > 0 then
+				return sn(nil, { t(parent.env.SELECT_RAW) })
 			else
 				return sn(nil, { i(1) })
 			end
 		end, {}, {}),
 		t(" ⟩ "),
-	}, { condition = mathZone }))
-	asnip(s({ trig = "kk;", hidden = true }, {
+	}))
+	asnip(s({ trig = "kk;", hidden = true, condition = mathZone }, {
 		t("⟦ "),
-		d(1, function(arg, snip, oldState, userArg)
-			if #snip.env.SELECT_RAW > 0 then
-				return sn(nil, { t(snip.env.SELECT_RAW) })
+		d(1, function(arg, parent, oldState, userArg)
+			if #parent.env.SELECT_RAW > 0 then
+				return sn(nil, { t(parent.env.SELECT_RAW) })
 			else
 				return sn(nil, { i(1) })
 			end
 		end, {}, {}),
 		t(" ⟧ "),
 	}, { condition = mathZone }))
-	snip(s({ trig = "abs", hidden = true }, {
-		t("| "),
-		d(1, function(arg, snip, oldState, userArg)
-			if #snip.env.SELECT_RAW > 0 then
-				return sn(nil, { t(snip.env.SELECT_RAW) })
-			else
-				return sn(nil, { i(1) })
-			end
-		end, {}, {}),
-		t(" | "),
-	}, { condition = mathZone }))
-	snip(s({ trig = "nrm", hidden = true }, {
-		t("‖ "),
-		d(1, function(arg, snip, oldState, userArg)
-			if #snip.env.SELECT_RAW > 0 then
-				return sn(nil, { t(snip.env.SELECT_RAW) })
-			else
-				return sn(nil, { i(1) })
-			end
-		end, {}, {}),
-		t(" ‖ "),
-	}, { condition = mathZone }))
-	snip(s({ trig = "floor", hidden = true }, {
-		t("floor( "),
-		d(1, function(arg, snip, oldState, userArg)
-			if #snip.env.SELECT_RAW > 0 then
-				return sn(nil, { t(snip.env.SELECT_RAW) })
+	asnip(s({ trig = "abs;", hidden = true, condition = mathZone }, {
+		t("abs( "),
+		d(1, function(arg, parent, oldState, userArg)
+			if #parent.env.SELECT_RAW > 0 then
+				return sn(nil, { t(parent.env.SELECT_RAW) })
 			else
 				return sn(nil, { i(1) })
 			end
 		end, {}, {}),
 		t(" ) "),
 	}, { condition = mathZone }))
-	snip(s({ trig = "ceil", hidden = true }, {
+	snip(s({ trig = "nrm", hidden = true, condition = mathZone }, {
+		t("‖ "),
+		d(1, function(arg, parent, oldState, userArg)
+			if #parent.env.SELECT_RAW > 0 then
+				return sn(nil, { t(parent.env.SELECT_RAW) })
+			else
+				return sn(nil, { i(1) })
+			end
+		end, {}, {}),
+		t(" ‖ "),
+	}, { condition = mathZone }))
+	snip(s({ trig = "floor", hidden = true, condition = mathZone }, {
+		t("floor( "),
+		d(1, function(arg, parent, oldState, userArg)
+			if #parent.env.SELECT_RAW > 0 then
+				return sn(nil, { t(parent.env.SELECT_RAW) })
+			else
+				return sn(nil, { i(1) })
+			end
+		end, {}, {}),
+		t(" ) "),
+	}, { condition = mathZone }))
+	snip(s({ trig = "ceil", hidden = true, condition = mathZone }, {
 		t("ceil( "),
-		d(1, function(arg, snip, oldState, userArg)
-			if #snip.env.SELECT_RAW > 0 then
-				return sn(nil, { t(snip.env.SELECT_RAW) })
+		d(1, function(arg, parent, oldState, userArg)
+			if #parent.env.SELECT_RAW > 0 then
+				return sn(nil, { t(parent.env.SELECT_RAW) })
 			else
 				return sn(nil, { i(1) })
 			end
@@ -761,66 +756,67 @@ Brackets()
 
 --文字
 local function Texts()
-	asnip(s({ trig = "s.t.", hidden = true }, { t("stW") }, { condition = mathZone }))
-	snip(s({ trig = "and", hidden = true }, { t("andW") }, { condition = mathZone }))
-	snip(s({ trig = "ksw", hidden = true }, { t("space.en ") }, { condition = mathZone }))
-	snip(s({ trig = "iff", hidden = true }, { t("iffW ") }, { condition = mathZone }))
-	snip(s({ trig = "if", hidden = true }, { t("ifW") }, { condition = mathZone }))
-	snip(s({ trig = "or", hidden = true }, { t("orW") }, { condition = mathZone }))
+	asnip(s({ trig = "s.t.", hidden = true, condition = mathZone }, { t("stW") }))
+	snip(s({ trig = "and", hidden = true, condition = mathZone }, { t("andW") }))
+	snip(s({ trig = "ksw", hidden = true, condition = mathZone }, { t("space.en ") }))
+	snip(s({ trig = "iff", hidden = true, condition = mathZone }, { t("iffW ") }))
+	snip(s({ trig = "if", hidden = true, condition = mathZone }, { t("ifW") }))
+	snip(s({ trig = "or", hidden = true, condition = mathZone }, { t("orW") }))
 end
 Texts()
 
 --极限
 local function Limits()
-	snip(
+	asnip(
 		s(
-			{ trig = "lim", hidden = true },
-			{ t("lim _( "), i(1), i(2, " → "), i(3), t(" )") },
-			{ condition = mathZone }
+			{ trig = "lim;", hidden = false, condition = mathZone },
+			{ t("lim _( "), i(1), i(2, " → "), i(3), t(" )") }
 		)
 	)
-	snip(
+	asnip(
 		s(
-			{ trig = "liminf", hidden = true },
-			{ t("liminf _( "), i(1), i(2, " → "), i(3), t(" )") },
-			{ condition = mathZone }
+			{ trig = "liminf;", hidden = false, condition = mathZone },
+			{ t("liminf _( "), i(1), i(2, " → "), i(3), t(" )") }
 		)
 	)
-	snip(
+	asnip(
 		s(
-			{ trig = "limsup", hidden = true },
-			{ t("limsup _( "), i(1), i(2, " → "), i(3), t(" )") },
-			{ condition = mathZone }
+			{ trig = "limsup;", hidden = false , condition = mathZone},
+			{ t("limsup _( "), i(1), i(2, " → "), i(3), t(" )") }
 		)
 	)
-	snip(s({ trig = "inf", hidden = true }, { t("inf _( "), i(1), t(" )") }, { condition = mathZone }))
-	snip(s({ trig = "sup", hidden = true }, { t("sup _( "), i(1), t(" )") }, { condition = mathZone }))
+	asnip(s({ trig = "inf;", hidden = false, condition = mathZone }, { t("inf _( "), i(1), t(" )") }, { condition = mathZone }))
+	asnip(s({ trig = "sup;", hidden = false, condition = mathZone }, { t("sup _( "), i(1), t(" )") }, { condition = mathZone }))
 end
 Limits()
 
 --根式
 local function Root()
-	snip(s({ trig = "sqrt", wordTrig = false, hidden = true }, {
+	snip(s({ trig = "sqrt", wordTrig = false, hidden = true, condition = mathZone }, {
 		t("sqrt( "),
-		d(1, function(arg, snip, oldState, userArg)
-			if #snip.env.SELECT_RAW > 0 then
-				return sn(nil, { t(snip.env.SELECT_RAW) })
+		d(1, function(arg, parent, oldState, userArg)
+			if #parent.env.SELECT_RAW > 0 then
+				return sn(nil, { t(parent.env.SELECT_RAW) })
 			else
 				return sn(nil, { i(1) })
 			end
 		end, {}, {}),
 		t(" ) "),
-	}, { condition = mathZone }))
+	}))
 	asnip(
 		s(
-			{ trig = "sqrt;([^%s])", wordTrig = false, hidden = true, trigEngine = "pattern" },
-			{ t("sqrt( "), f(function(arg, snip, userArg)
-				return snip.captures[1]
-			end, {}), i(1), t(" ) ") },
-			{ condition = mathZone }
-		)
+			{ trig = "sqrt;([^%s])", wordTrig = false, hidden = true, trigEngine = "pattern",condition = mathZone },
+			{ 
+                t("sqrt( "), 
+                f(function(arg, snip, userArg)
+                    return snip.captures[1]
+                end, {}),
+                i(1),
+                t(" ) ")
+            }
+        )
 	)
-	snip(s({ trig = "root", wordTrig = false, hidden = true }, {
+	snip(s({ trig = "root", wordTrig = false, hidden = false, condition = mathZone }, {
 		t("root( "),
 		i(2),
 		t(" , "),
@@ -832,17 +828,17 @@ local function Root()
 			end
 		end, {}, {}),
 		t(" ) "),
-	}, { condition = mathZone }))
-	asnip(s({ trig = "root;([^%s])", wordTrig = false, hidden = true, trigEngine = "pattern" }, {
+	}))
+	asnip(s({ trig = "root;([^%s])", wordTrig = false, hidden = true, trigEngine = "pattern",condition = mathZone }, {
 		t("root( "),
-		i(1),
+		i(2),
 		t(" , "),
 		f(function(arg, snip, userArg)
 			return snip.captures[1]
 		end, {}),
-		i(2),
+		i(1),
 		t(" ) "),
-	}, { condition = mathZone }))
+	}))
 end
 Root()
 
@@ -852,11 +848,11 @@ local function UnderOverContent()
 		if key == nil then
 			key = ";"
 		end
-		snip(s({ trig = name, hidden = true, trigEngine = "pattern" }, {
+		snip(s({ trig = name, hidden = false, trigEngine = "pattern", condition = mathZone }, {
 			t(effect .. "( "),
-			d(1, function(arg, snip, oldState, userArg)
-				if #snip.env.SELECT_RAW > 0 then
-					return sn(nil, { t(snip.env.SELECT_RAW) })
+			d(1, function(arg, parent, oldState, userArg)
+				if #parent.env.SELECT_RAW > 0 then
+					return sn(nil, { t(parent.env.SELECT_RAW) })
 				else
 					return sn(nil, { i(1) })
 				end
@@ -864,8 +860,8 @@ local function UnderOverContent()
 			t(" , "),
 			i(2),
 			t(" ) "),
-		}, { condition = mathZone }))
-		asnip(s({ trig = name .. key .. "(%w)", hidden = true, trigEngine = "pattern" }, {
+		}))
+		asnip(s({ trig = name .. key .. "([^%s])", hidden = true, trigEngine = "pattern", condition = mathZone }, {
 			t(effect .. "( "),
 			f(function(arg, snip, userArg)
 				return snip.captures[1]
@@ -874,12 +870,12 @@ local function UnderOverContent()
 			t(" , "),
 			i(2),
 			t(" ) "),
-		}, { condition = mathZone }))
+		}))
 	end
-	addSnip("ubc", "overbrace", ";")
-	addSnip("dbc", "underbrace", ";")
-	addSnip("ukc", "overbracket", ";")
-	addSnip("dkc", "underbracket", ";")
+	addSnip("ubc", "overbrace")
+	addSnip("dbc", "underbrace")
+	addSnip("ukc", "overbracket")
+	addSnip("dkc", "underbracket")
 end
 UnderOverContent()
 
@@ -980,119 +976,111 @@ Differential()
 --------------------------------装饰--------------------------------
 --字体
 local function Fonts()
-	asnip(s({ trig = ";b(%w)", wordTrig = false, hidden = true, trigEngine = "pattern" }, {
+	asnip(s({ trig = ";b(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone }, {
 		t('mbb("'),
-		f(function(arg, snip, userArg)
-			return snip.captures[1]
+		f(function(arg, parent, userArg)
+			return parent.captures[1]
 		end, {}),
 		i(1),
 		t('") '),
-	}, { condition = mathZone }))
-	asnip(s({ trig = ";f(%w)", wordTrig = false, hidden = true, trigEngine = "pattern" }, {
+	}))
+	asnip(s({ trig = ";f(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone }, {
 		t("frak( "),
-		f(function(arg, snip, userArg)
-			return snip.captures[1]
+		f(function(arg, parent, userArg)
+			return parent.captures[1]
 		end, {}),
 		i(1),
 		t(" ) "),
-	}, { condition = mathZone }))
-	asnip(s({ trig = ";c(%w)", wordTrig = false, hidden = true, trigEngine = "pattern" }, {
+	}))
+	asnip(s({ trig = ";c(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone }, {
 		t("cal( "),
-		f(function(arg, snip, userArg)
-			return snip.captures[1]
+		f(function(arg, parent, userArg)
+			return parent.captures[1]
 		end, {}),
 		i(1),
 		t(" ) "),
-	}, { condition = mathZone }))
-	asnip(s({ trig = ";s(%w)", wordTrig = false, hidden = true, trigEngine = "pattern" }, {
+	}))
+	asnip(s({ trig = ";s(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone }, {
 		t("scr( "),
-		f(function(arg, snip, userArg)
-			return snip.captures[1]
+		f(function(arg, parent, userArg)
+			return parent.captures[1]
 		end, {}),
 		i(1),
 		t(" ) "),
-	}, { condition = mathZone }))
-	asnip(s({ trig = ";v(%w)", wordTrig = false, regTrig = true, hidden = true }, {
+	}))
+	asnip(s({ trig = ";v(%w)", wordTrig = false, regTrig = true, hidden = true, condition = mathZone }, {
 		t("ubold( "),
-		f(function(arg, snip, userArg)
-			return snip.captures[1]
+		f(function(arg, parent, userArg)
+			return parent.captures[1]
 		end, {}),
 		i(1),
 		t(" ) "),
-	}, { condition = mathZone }))
-	asnip(s({ trig = ";i(%w)", wordTrig = false, regTrig = true, hidden = true }, {
+	}))
+	asnip(s({ trig = ";i(%w)", wordTrig = false, regTrig = true, hidden = true, condition = mathZone }, {
 		t("italic( "),
-		f(function(arg, snip, userArg)
-			return snip.captures[1]
+		f(function(arg, parent, userArg)
+			return parent.captures[1]
 		end, {}),
 		i(1),
 		t(" ) "),
-	}, { condition = mathZone }))
+	}))
 end
 Fonts()
 
 --上下标
 local function Attach()
-	snip(s({ trig = "uu", wordTrig = false, hidden = true }, {
+	snip(s({ trig = "uu", wordTrig = false, hidden = true, condition = mathZone }, {
 		t("^( "),
-		d(1, function(arg, snip, oldState, userArg)
-			if #snip.env.SELECT_RAW > 0 then
-				return sn(nil, { t(snip.env.SELECT_RAW) })
+		d(1, function(arg, parent, oldState, userArg)
+			if #parent.env.SELECT_RAW > 0 then
+				return sn(nil, { t(parent.env.SELECT_RAW) })
 			else
 				return sn(nil, { i(1) })
 			end
 		end, {}, {}),
 		t(" ) "),
-	}, { condition = mathZone }))
+	}))
 	asnip(
 		s(
-			{ trig = "uu([^%s])", wordTrig = false, hidden = true, trigEngine = "pattern" },
-			{ t("^( "), f(function(arg, snip, userArg)
-				return snip.captures[1]
-			end, {}), t(" ) ") },
-			{
-				condition = mathZone,
-			}
+			{ trig = "uu([^%s])", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },
+			{ t("^( "), f(function(arg, parent, userArg)
+				return parent.captures[1]
+			end, {}), t(" ) ") }
 		)
 	)
 	asnip(
 		s(
-			{ trig = "uu ([^%s])", wordTrig = false, hidden = true, trigEngine = "pattern" },
-			{ t("^( "), f(function(arg, snip, userArg)
-				return snip.captures[1]
-			end, {}), i(1), t(" ) ") },
-			{ condition = mathZone }
+			{ trig = "uu ([^%s])", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },
+			{ t("^( "), f(function(arg, parent, userArg)
+				return parent.captures[1]
+			end, {}), i(1), t(" ) ") }
 		)
 	)
-	snip(s({ trig = "dd", wordTrig = false, hidden = true }, {
+	snip(s({ trig = "dd", wordTrig = false, hidden = true, condition = mathZone }, {
 		t("_( "),
-		d(1, function(arg, snip, oldState, userArg)
-			if #snip.env.SELECT_RAW > 0 then
-				return sn(nil, { t(snip.env.SELECT_RAW) })
+		d(1, function(arg, parent, oldState, userArg)
+			if #parent.env.SELECT_RAW > 0 then
+				return sn(nil, { t(parent.env.SELECT_RAW) })
 			else
 				return sn(nil, { i(1) })
 			end
 		end, {}, {}),
 		t(" ) "),
-	}, { condition = mathZone }))
+	}))
 	asnip(
 		s(
-			{ trig = "dd([^%s])", wordTrig = false, hidden = true, trigEngine = "pattern" },
-			{ t("_( "), f(function(arg, snip, userArg)
-				return snip.captures[1]
-			end, {}), t(" ) ") },
-			{
-				condition = mathZone,
-			}
+			{ trig = "dd([^%s])", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },
+			{ t("_( "), f(function(arg, parent, userArg)
+				return parent.captures[1]
+			end, {}), t(" ) ") }
 		)
 	)
 	asnip(
 		s(
-			{ trig = "dd ([^%s])", wordTrig = false, hidden = true, trigEngine = "pattern" },
-			{ t("_( "), f(function(arg, snip, userArg)
-				return snip.captures[1]
-			end, {}), i(1), t(" ) ") },
-			{ condition = mathZone }
+			{ trig = "dd ([^%s])", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },
+			{ t("_( "), f(function(arg, parent, userArg)
+				return parent.captures[1]
+			end, {}), i(1), t(" ) ") }
 		)
 	)
 end
@@ -1114,25 +1102,25 @@ local function Hats()
 		if key == nil then
 			key = ";"
 		end
-		snip(s({ trig = name, hidden = true, trigEngine = "pattern" }, {
+		snip(s({ trig = name, hidden = true, trigEngine = "pattern", condition = mathZone }, {
 			t(effect .. "( "),
-			d(1, function(arg, snip, oldState, userArg)
-				if #snip.env.SELECT_RAW > 0 then
-					return sn(nil, { t(snip.env.SELECT_RAW) })
+			d(1, function(arg, parent, oldState, userArg)
+				if #parent.env.SELECT_RAW > 0 then
+					return sn(nil, { t(parent.env.SELECT_RAW) })
 				else
 					return sn(nil, { i(1) })
 				end
 			end, {}, {}),
 			t(" ) "),
-		}, { condition = mathZone }))
-		asnip(s({ trig = name .. key .. "(%w)", hidden = true, trigEngine = "pattern" }, {
+		}))
+		asnip(s({ trig = name .. key .. "(%w)", hidden = true, trigEngine = "pattern", condition = mathZone }, {
 			t(effect .. "( "),
-			f(function(arg, snip, userArg)
-				return snip.captures[1]
+			f(function(arg, parent, userArg)
+				return parent.captures[1]
 			end, {}),
 			i(1),
 			t(" ) "),
-		}, { condition = mathZone }))
+		}))
 	end
 	local alpha = {
 		{ "u%.", "arrow", "%." },
@@ -1162,7 +1150,7 @@ local function Cases()
 			i(1),
 			t("    #h(2em)&    "),
 			i(2),
-			d(3, function(arg, snip, oldState, ...)
+			d(3, function(arg, parent, oldState, ...)
 				local str = arg[1][1]
 				local len = string.len(str)
 				if string.sub(str, len, len) == "," then
@@ -1173,24 +1161,24 @@ local function Cases()
 			end, { 2 }),
 		})
 	end
-	snip(s({ trig = "case", hidden = true }, {
+	snip(s({ trig = "case", hidden = true, condition = mathZone }, {
 		t({ "cases(" }),
-		d(1, function(arg, snip, oldState, usaerArg)
+		d(1, function(arg, parent, oldState, usaerArg)
 			return sn(nil, { d(1, generateCases, {}) })
 		end),
 		t({ "", ")" }),
-	}, { condition = mathZone }))
+	}))
 end
 Cases()
 
 local function Matrix1()
 	--SimpleMatrix
 	local generateElm
-	generateElm = function(arg0, snip0, oldState0, firstElm)
+	generateElm = function(arg0, parent0, oldState0, firstElm)
 		return sn(nil, {
 			t(({ "    ", ",  " })[firstElm]),
 			i(1),
-			d(2, function(arg, snip, oldState, userArg)
+			d(2, function(arg, parent, oldState, userArg)
 				local str = arg[1][1]
 				local len = string.len(str)
 				if len == 0 or string.sub(str, len - 2, len) == ";//" then
@@ -1203,13 +1191,13 @@ local function Matrix1()
 			end, { 1 }),
 		})
 	end
-	snip(s({ trig = "mat", hidden = true }, {
+	snip(s({ trig = "mat", hidden = true, condition = mathZone }, {
 		t({ "mat(", "" }),
-		d(1, function(arg, snip, oldState, userArg)
+		d(1, function(arg, parent, oldState, userArg)
 			return sn(nil, { d(1, generateElm, {}, { user_args = { 1 } }) })
 		end),
 		t({ "", ")" }),
-	}, { condition = mathZone }))
+	}))
 end
 Matrix1()
 
