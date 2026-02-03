@@ -29,30 +29,30 @@ local key = require("luasnip.nodes.key_indexer").new_key
 local snippets, autosnippets = {}, {}
 
 local function mathZone()
-    local cur=vim.treesitter.get_node()
-    local root=cur:tree():root()
-    local flag=false
-    local arr={content=true,string=true}
-    while true do
-        if cur:type()=="math" then
-            flag=true
-            break
-        elseif arr[cur:type()] or cur==root then
-            break
-        else
-            cur=cur:parent()
-        end
-    end
-    return flag
+	local cur = vim.treesitter.get_node()
+	local root = cur:tree():root()
+	local flag = false
+	local arr = { content = true, string = true }
+	while true do
+		if cur:type() == "math" then
+			flag = true
+			break
+		elseif arr[cur:type()] or cur == root then
+			break
+		else
+			cur = cur:parent()
+		end
+	end
+	return flag
 end
 
 local function plainText()
-    return (not mathZone()) or vim.treesitter.get_node():root():has_error()
+	return (not mathZone()) or vim.treesitter.get_node():tree():root():has_error()
 end
 
-local mathOptShow = { hidden = true, wordTrig = false, condition = mathZone }
+local mathOptShow = { hidden = false, wordTrig = false, condition = mathZone }
 local mathOptHide = { hidden = false, wordTrig = false, condition = mathZone }
-local mathOptShowAuto = { hidden = true, wordTrig = false, condition = mathZone, auto = true }
+local mathOptShowAuto = { hidden = false, wordTrig = false, condition = mathZone, auto = true }
 local mathOptHideAuto = { hidden = false, wordTrig = false, condition = mathZone, auto = true }
 
 local function snip(val)
@@ -95,79 +95,119 @@ local function transferSnip(arr, opts)
 	end
 end
 
-local function orderSnip(arr, opts)
-	-- Example
-	-- {
-	--     {"<",{","},{{",","."}}},
-	--     {">",{"."},{{",","."}}},
-	--     {"≮",{","},{{",","."}}},
-	--     {"≯",{"."},{{",","."}}},
-	--     {"≤",{",","e"},{{",","."}}},
-	--     {"≥",{".","e"},{{",","."}}},
-	--     {"≰",{",","e","n"},{{",","."}}},
-	--     {"≱",{".","e","n"},{{",","."}}},
+local function orderSnip(relation, altClass, toggleList, opts)
+	-- Example:
+	-- relation={
+	--     {"<",{","}},
+	--     {">",{"."}},
+	--     {"≮",{","}},
+	--     {"≯",{"."}},
+	--     {"≤",{",","e"}},
+	--     {"≥",{".","e"}},
+	--     {"≰",{",","e","n"}},
+	--     {"≱",{".","e","n"}},
 	-- }
-	-- { { <target>, <attributes>, {<alt_class1>,<alt_class2>,...} },...}
+	-- alt_class={{",","."}}
+	-- toggle_list={"e","n"}
+	opts = vim.deepcopy(opts)
 	local addSnip = opts.auto and asnip or snip
-
-	for _, v in pairs(arr) do
-		local tmp = {}
-		for _, w in pairs(v[2]) do
-			tmp[w] = tmp[w] and tmp[w] + 1 or 1
+	-- 预处理
+	-- 将属性集转化为字典
+	for _, node in pairs(relation) do
+		local cnt = {}
+		for _, attr in pairs(node[2]) do
+			cnt[attr] = cnt[attr] and cnt[attr] + 1 or 1
 		end
-		v.numAttr = #v[2]
-		v[2] = tmp
-		if v[3] == nil then
-			v[3] = {}
+		node.symb = node[1]
+		node.attr = cnt
+		node.numAttr = #node[2]
+	end
+	-- 将toggleList处理为字典
+	local toggleSet = {}
+	for _, v in ipairs(toggleList or {}) do
+		toggleSet[v] = true
+	end
+	-- 创建altClass索引
+	local altClassIndex = {}
+	for k, v in ipairs(altClass or {}) do
+		for _, w in ipairs(v) do
+			altClassIndex[w] = k
 		end
 	end
-	for k1, trgt in pairs(arr) do
-		for k2, from in pairs(arr) do
-			if k1 == k2 or trgt.cls ~= from.cls then
+	-- 属性对称差(b-a)
+	local function symDiff(a, b)
+		local diff = {}
+		local keys = {}
+		for k in pairs(a) do
+			keys[k] = true
+		end
+		for k in pairs(b) do
+			keys[k] = true
+		end
+		local size = 0
+		for k in pairs(keys) do
+			local d = (b[k] or 0) - (a[k] or 0)
+			if d ~= 0 then
+				diff[k] = d
+				size = size + math.abs(d)
+			end
+		end
+		return diff, size
+	end
+	-- 增加属性
+	for _, target in pairs(relation) do
+		for _, source in pairs(relation) do
+			if target.numAttr - source.numAttr ~= 1 then
 				goto continue
 			end
+			for attr, count in pairs(target.attr) do
+				local tryAttr = vim.deepcopy(target.attr)
+				if count > 1 then
+					tryAttr[attr] = count - 1
+				else
+					tryAttr[attr] = nil
+				end
+				local _, diffSize = symDiff(source.attr, tryAttr)
+				if diffSize == 0 then
+					-- 正向 <symbol><attr> -> <symbol>
+					opts.trig = source.symb .. attr
+					addSnip(s(vim.deepcopy(opts), { t(target.symb) }))
 
-			local tmp = nil
-			for k, v in pairs(trgt[2]) do
-				if from[2][k] == nil then
-					tmp = tmp == nil and k or false
-				elseif from[2][k] == v - 1 then
-					tmp = tmp == nil and k or false
-				elseif from[2][k] > v then
-					tmp = false
+					-- 反向 <source>-<attr> -> <symbol>
+					if toggleSet[attr] then
+						opts.trig = target.symb .. attr
+						addSnip(s(vim.deepcopy(opts), { t(source.symb) }))
+					else
+						opts.trig = target.symb .. "-" .. attr
+						addSnip(s(vim.deepcopy(opts), { t(source.symb) }))
+					end
 				end
 			end
-			if tmp and from.numAttr + 1 == trgt.numAttr then
-				opts.trig = from[1] .. tmp
-				addSnip(s(opts, { t(trgt[1]) }))
+			::continue::
+		end
+	end
+	-- 替换属性
+	for i = 1, #relation do
+        for j = i + 1, #relation do
+			local node1, node2 = relation[i], relation[j]
+			if node1.numAttr ~= node2.numAttr then
+				goto continue
 			end
-			for _, alts in pairs(trgt[3]) do
-				for _, alt1 in pairs(alts) do
-					if trgt[2][alt1]==nil then
-                        goto next_alt1
-                    end
-
-                    for _, alt2 in pairs(alts) do
-                        if alt1 == alt2 then
-                            goto next_alt2
-                        end
-                        trgt[2][alt2] = trgt[2][alt1]
-                        trgt[2][alt1] = nil
-                        tmp = true
-                        for k, v in pairs(trgt[2]) do
-                            if from[2][k] ~= v then
-                                tmp = false
-                            end
-                        end
-                        if tmp and from.numAttr == trgt.numAttr then
-                            opts.trig = from[1] .. alt1
-                            addSnip(s(opts, { t(trgt[1]) }))
-                        end
-                        trgt[2][alt1] = trgt[2][alt2]
-                        trgt[2][alt2] = nil
-                        ::next_alt2::
-                    end
-                    ::next_alt1::
+			local diff, size = symDiff(node1.attr, node2.attr)
+			if size == 2 then
+				local a, b = nil, nil
+				for k, v in pairs(diff) do
+					if v == -1 then
+						a = k
+					elseif v == 1 then
+						b = k
+					end
+				end
+				if a and b and altClassIndex[a] and altClassIndex[a] == altClassIndex[b] then
+					opts.trig = node1.symb .. b
+					addSnip(s(vim.deepcopy(opts), { t(node2.symb) }))
+					opts.trig = node2.symb .. a
+					addSnip(s(vim.deepcopy(opts), { t(node1.symb) }))
 				end
 			end
 			::continue::
@@ -213,7 +253,7 @@ local function tests()
 		s("test:insert", { i(2, ">>>insert 1<<<"), t(" "), sn(1, { i(1, ">>>insert 2<<<") }), i(3, ">>>insert 3<<<") })
 	snip(test2)
 
-    local test3 = s("test:function", {
+	local test3 = s("test:function", {
 		t("<1: "),
 		i(1),
 		t(">"),
@@ -257,7 +297,7 @@ local function tests()
 		else
 			return "<" .. tostring(x) .. ">"
 		end
-	end	
+	end
 
 	local test4data = {
 		t("<"),
@@ -280,29 +320,46 @@ local function tests()
 
 	local test6 = s("test:ts", {
 		f(function()
-            local str=""
-            local cur=vim.treesitter.get_node()
-            local root=cur:tree():root()
-            while true do
-                str= str=="" and tostring(cur:type()) or str.." "..tostring(cur:type())
-                if cur==root then
-                    str=str..tostring(cur:has_error())
-                    break
-                else
-                    cur=cur:parent()
-                end
-            end
-            return str
+			local str = ""
+			local cur = vim.treesitter.get_node()
+			local root = cur:tree():root()
+			while true do
+				str = str == "" and tostring(cur:type()) or str .. " " .. tostring(cur:type())
+				if cur == root then
+					str = str .. tostring(cur:has_error())
+					break
+				else
+					cur = cur:parent()
+				end
+			end
+			return str
 		end, {}, {}),
 	})
 	asnip(test6)
 
-    local test7=s({trig="test:ecma([0-9])",trigEngine="ecma"}, {
-        f(function(arg,parent,userArg)
+	local test7 = s({ trig = "test:ecma([0-9])", trigEngine = "ecma" }, {
+		f(function(arg, parent, userArg)
 			return parent.captures
 		end, {}, {}),
-    })
-    snip(test7)
+	})
+	snip(test7)
+
+	local globalCounter = 0
+	local function counter()
+		globalCounter = globalCounter + 1
+		return tostring(globalCounter)
+	end
+	local test8 = s({ trig = "test:count" }, {
+		f(counter),
+	})
+	snip(test8)
+
+	local test9 = s({ trig = "test:update" }, {
+		d(1, function(arg)
+			return sn(nil, { i(1, { key = "child" }), t(": ") })
+		end, { key("child") }, {}),
+	})
+	snip(test9)
 end
 tests()
 
@@ -335,25 +392,30 @@ local function Symbols()
 		{ "lap;", "∆" },
 		{ "nab;", "∇" },
 		{ "par;", "∂" },
+		{ "int;", "∫" },
 		{ "|m", "mid(|)" },
 	}
 	simpleSnip(arr, mathOptHideAuto)
+	local relation={
+		{ "∃",{}},
+		{ "∄",{"n"} },
+	}
+	orderSnip(relation,{},{"n"},mathOptShowAuto)
 end
 Symbols()
 
 --积分
 local function Integrals()
 	local arr = {
-		{ "int;", "∫" },
-		{ "∫i", "∬" },
-		{ "∬i", "∭" },
-		{ "∮i", "∯" },
-		{ "∯i", "∰" },
-		{ "∫o", "∮" },
-		{ "∬o", "∯" },
-		{ "∭o", "∰" },
+		{ "∫", { "i" } },
+		{ "∬", { "i", "i" } },
+		{ "∭", { "i", "i", "i" } },
+		{ "∮", { "i", "o" } },
+		{ "∯", { "i", "i", "o" } },
+		{ "∰", { "i", "i", "i", "o" } },
 	}
-	simpleSnip(arr, mathOptHideAuto)
+	local toggleList = { "o" }
+	orderSnip(arr, {}, toggleList, mathOptShowAuto)
 end
 Integrals()
 
@@ -416,7 +478,7 @@ local function BigOperators()
 	for _, v in pairs(arr) do
 		snip(s({ trig = v[1], condition = mathZone }, { t(v[2] .. " _( "), i(1), t(" ) ^( "), i(2), t(" ) ") }))
 		snip(s({
-			trig = v[1] .. " ([^%s]*) ([^%s]*) ([^%s]*)%s*",
+			trig = v[1] .. "%s+([^%s]+)%s+([^%s]*)%s+([^%s]*)%s*",
 			hidden = true,
 			trigEngine = "pattern",
 			condition = mathZone,
@@ -480,139 +542,219 @@ Operators()
 
 --关系符
 local function Relations()
-	local other = {
-		{ "in;", "∈" },
-		{ "sub;", "⊂" },
-		{ "sup;", "⊃" },
-
-		{ "sim", "〜" },
-		{ "prop;", "∝" },
-
-		{ "divs;", "∣" },
-		{ "∣n", "∤" },
-
-		{ "join", "⨝" },
-		{ "⨝,", "⟕" },
-		{ "⨝.", "⟖" },
-		{ "⟕.", "⟗" },
-		{ "⟖,", "⟗" },
-	}
-	simpleSnip(other, mathOptShowAuto)
-
-	local eq = {
-		{ "ee;", "=" },
-		{ "ne;", "≠" },
-		{ "eee", "≡" },
-		{ "≡n", "≢" },
-		{ "≢n", "≡" },
-		{ "eeee", "≣" },
-
-		{ "se;", "⋍" },
-		{ "⋍n", "≄" },
-		{ "see;", "≅" },
-		{ "≅n", "≇" },
-
-		{ ":=", "≔" },
-		{ "=def", "≝" },
-		{ "=?", "≟" },
-
-		{ ",e", "≤" },
-		{ ".e", "≥" },
-	}
-	simpleSnip(eq, mathOptShowAuto)
-
-	local arr1 = {
-		{ "<", { "," }, { { ",", "." } } },
-		{ ">", { "." }, { { ",", "." } } },
-		{ "≮", { ",", "n" }, { { ",", "." } } },
-		{ "≯", { ".", "n" }, { { ",", "." } } },
-		{ "≤", { ",", "e" }, { { ",", "." } } },
-		{ "≥", { ".", "e" }, { { ",", "." } } },
-		{ "≰", { ",", "e", "n" }, { { ",", "." } } },
-		{ "≱", { ".", "e", "n" }, { { ",", "." } } },
-
-		{ "⊲", { ",", "t" }, { { ",", "." } } },
-		{ "⊳", { ".", "t" }, { { ",", "." } } },
-		{ "⋪", { ",", "e", "n" }, { { ",", "." } } },
-		{ "⋫", { ".", "e", "n" }, { { ",", "." } } },
-		{ "⊴", { ",", "t", "e" }, { { ",", "." } } },
-		{ "⊵", { ".", "t", "e" }, { { ",", "." } } },
-		{ "⋬", { ",", "t", "e", "n" }, { { ",", "." } } },
-		{ "⋭", { ".", "t", "e", "n" }, { { ",", "." } } },
-
-		{ "≺", { ",", "c" }, { { ",", "." } } },
-		{ "≻", { ".", "c" }, { { ",", "." } } },
-		{ "⊀", { ",", "c", "n" }, { { ",", "." } } },
-		{ "⊁", { ".", "c", "n" }, { { ",", "." } } },
-		{ "≼", { ",", "c", "e" }, { { ",", "." } } },
-		{ "≽", { ".", "c", "e" }, { { ",", "." } } },
-		{ "⋠", { ",", "c", "e", "n" }, { { ",", "." } } },
-		{ "⋡", { ".", "c", "e", "n" }, { { ",", "." } } },
-	}
-	orderSnip(arr1, mathOptShowAuto)
-
-	local arr2 = {
-		{ "∈", { "." }, { { ",", "." } } },
-		{ "∋", { "," }, { { ",", "." } } },
-		{ "∉", { ".", "n" }, { { ",", "." } } },
-		{ "∌", { ",", "n" }, { { ",", "." } } },
-	}
-	orderSnip(arr2, mathOptShowAuto)
-
-	local arr3 = {
-		{ "⊂", { "." }, { { ",", "." } } },
-		{ "⊃", { "," }, { { ",", "." } } },
-		{ "⊄", { ".", "n" }, { { ",", "." } } },
-		{ "⊅", { ",", "n" }, { { ",", "." } } },
-		{ "⊆", { ".", "e" }, { { ",", "." } } },
-		{ "⊇", { ",", "e" }, { { ",", "." } } },
-		{ "⊊", { ".", "e", "n" }, { { ",", "." } } },
-		{ "⊋", { ",", "e", "n" }, { { ",", "." } } },
-		{ "⊏", { ".", "s" }, { { ",", "." } } },
-		{ "⊐", { ",", "s" }, { { ",", "." } } },
-		{ "⊑", { ".", "s", "e" }, { { ",", "." } } },
-		{ "⊒", { ",", "s", "e" }, { { ",", "." } } },
-		{ "⋤", { ".", "s", "e", "n" }, { { ",", "." } } },
-		{ "⋥", { ",", "s", "e", "n" }, { { ",", "." } } },
-	}
-	orderSnip(arr3, mathOptShowAuto)
+	simpleSnip({
+			{ "in;", "∈" },
+			{ "sub;", "⊂" },
+			{ "sup;", "⊃" },
+		},
+		mathOptShowAuto
+	)
+	orderSnip({
+			{ "∈", { "." }, { { ",", "." } } },
+			{ "∋", { "," }, { { ",", "." } } },
+			{ "∉", { ".", "n" }, { { ",", "." } } },
+			{ "∌", { ",", "n" }, { { ",", "." } } }
+		},
+		{{",","."}},
+		{"n"},
+		mathOptShowAuto
+	)
+	orderSnip({
+			{ "⊂", { "." }},
+			{ "⊃", { "," }},
+			{ "⊄", { ".", "n" }},
+			{ "⊅", { ",", "n" }},
+			{ "⊆", { ".", "e" }},
+			{ "⊇", { ",", "e" }},
+			{ "⊊", { ".", "e", "n" }},
+			{ "⊋", { ",", "e", "n" }},
+			{ "⊏", { ".", "s" }},
+			{ "⊐", { ",", "s" }},
+			{ "⊑", { ".", "s", "e" }},
+			{ "⊒", { ",", "s", "e" }},
+			{ "⋤", { ".", "s", "e", "n" }},
+			{ "⋥", { ",", "s", "e", "n" }},
+		},
+		{{",","."}},
+		{"e","s","n"},
+	 	mathOptShowAuto
+	)
 	switchSnip({ "⊊", "⊈" }, mathOptShow)
 	switchSnip({ "⊋", "⊉" }, mathOptShow)
 	switchSnip({ "⋤", "⋢" }, mathOptShow)
 	switchSnip({ "⋥", "⋣" }, mathOptShow)
+
+	simpleSnip({
+			{ "sim", "〜" },
+			{ "es;", "⋍" },
+			{ "ee;", "=" },
+			{ "ne;", "≠" },
+			{ "eee", "≡" },
+			{ ":=", "≔" },
+			{ "=def", "≝" },
+			{ "=?", "≟" },
+		},
+		mathOptShow
+	)
+	orderSnip({
+			{"=",{"l","l"}},
+			{"≠",{"l","l","n"}},
+			{"≡",{"l","l","l"}},
+			{"≢",{"l","l","l","n"}},
+			{"≣",{"l","l","l","l"}},
+			{"≅",{"l","l","s"}},
+			{"≇",{"l","l","s","n"}},
+			{"⋍",{"l","s"}},
+			{"≄",{"l","s","n"}},
+		},
+		{},
+		{"s","n"},
+		mathOptShowAuto
+	)
+
+	simpleSnip({
+			{ ",e", "≤" },
+			{ ".e", "≥" },
+		},
+		mathOptShow
+	)
+	orderSnip({
+			{ "<", { "," } },
+			{ ">", { "." } },
+			{ "≮", { ",", "n" } },
+			{ "≯", { ".", "n" } },
+			{ "≤", { ",", "e" } },
+			{ "≥", { ".", "e" } },
+			{ "≰", { ",", "e", "n" } },
+			{ "≱", { ".", "e", "n" } },
+
+			{ "⊲", { ",", "t" } },
+			{ "⊳", { ".", "t" } },
+			{ "⋪", { ",", "e", "n" } },
+			{ "⋫", { ".", "e", "n" } },
+			{ "⊴", { ",", "t", "e" } },
+			{ "⊵", { ".", "t", "e" } },
+			{ "⋬", { ",", "t", "e", "n" } },
+			{ "⋭", { ".", "t", "e", "n" } },
+
+			{ "≺", { ",", "c" } },
+			{ "≻", { ".", "c" }, },
+			{ "⊀", { ",", "c", "n" } },
+			{ "⊁", { ".", "c", "n" } },
+			{ "≼", { ",", "c", "e" } },
+			{ "≽", { ".", "c", "e" } },
+			{ "⋠", { ",", "c", "e", "n" } },
+			{ "⋡", { ".", "c", "e", "n" } },
+		},
+		{{",",""}},
+		{"t","c","n"},
+		mathOptShowAuto
+	)
+
+	-- other
+	simpleSnip({
+			{ "prop;", "∝" },
+
+			{ "div;", "\\/"},
+			{ "divs;", "∣" },
+
+			{ "join", "⨝" },
+		},
+		mathOptShowAuto
+	)
+	orderSnip({
+			{ "⨝", {} },
+			{ "⟕", {","} },
+			{ "⟖", {"."} },
+			{ "⟗", {",","."}}
+		},
+		{},
+		{",","."},
+		mathOptShowAuto
+	)
+	orderSnip({
+			{ "∣",{}},
+			{ "∤",{"n"} }
+		},
+		{},
+		{"n"},
+		mathOptShowAuto
+	)
 end
 Relations()
 
 --箭头
 local function Arrows()
+	asnip(s({ trig = "ar."}, { t("→") }, { condition = mathZone }))
+	asnip(s({ trig = "ar,"}, { t("←") }, { condition = mathZone }))
+	asnip(s({ trig = "arr."}, { t("⇒") }, { condition = mathZone }))
+	asnip(s({ trig = "arr,"}, { t("⇐") }, { condition = mathZone }))
+	snip(s({ trig = "map"}, { t("↦") }, { condition = mathZone }))
 	local arr = {
-		-- 方向：, . u d
+		-- 方向：, . u d 
+		-- 左右：s
+		-- 上下：v
 		-- 增加线数量：l
 		-- 增加尾部竖线：b
-		-- 增加箭头数量：h
-		-- 波浪：w
-		-- 圆弧：c
+		-- 钩子hook: ho
+		-- 加长：g
+		-- 增加箭头数量：hh
 		-- 半圆弧：hc
-		-- 长：lg
-		{ "→", { ".", "l" }, { { ",", "." } } },
-		{ "←", { ",", "l" }, { { ",", "." } } },
-		{ "↔", { ",", ".", "l" }, {} },
-		{ "⇒", { ".", "l", "l" }, { { ",", "." } } },
-		{ "⇐", { ",", "l", "l" }, { { ",", "." } } },
-		{ "⇔", { ",", ".", "l", "l" }, {} },
-		{ "↦", { ".", "l", "b" }, { { ",", "." } } },
-		{ "↤", { ",", "l", "b" }, { { ",", "." } } },
-		{ "↷", { ".", "l", "hc" }, { { ",", "." } } },
-		{ "↶", { ",", "l", "hc" }, { { ",", "." } } },
-	}
-	orderSnip(arr, mathOptShowAuto)
+		-- stop/wall: w
+		-- 点划线dashed: d
 
-	asnip(s({ trig = "arr.", hidden = true }, { t("→") }, { condition = mathZone }))
-	asnip(s({ trig = "arr,", hidden = true }, { t("←") }, { condition = mathZone }))
-	asnip(s({ trig = "a..", hidden = true }, { t("⇒") }, { condition = mathZone }))
-	asnip(s({ trig = "a,,", hidden = true }, { t("⇐") }, { condition = mathZone }))
-	asnip(s({ trig = "a,.", hidden = true }, { t("⇔") }, { condition = mathZone }))
-	snip(s({ trig = "map", hidden = false }, { t("↦") }, { condition = mathZone }))
+		{ "→", { ".", "l" } },
+		{ "←", { ",", "l" } },
+		{ "↑", { "u", "l" } },
+		{ "↓", { "d", "l" } },
+		{ "↔", { "s", "l" } },
+
+		{ "↦", { ".", "l", "b" } },
+		{ "↤", { ",", "l", "b" } },
+
+		{ "⇢", { ".", "l","d" } },
+		{ "⇠", { ",", "l","d" } },
+		{ "⇣", { "u", "l","d" } },
+		{ "⇡", { "d", "l","d" } },
+
+		{ "↛", { ".", "l", "n" } },
+		{ "↚", { ",", "l", "n" } },
+
+		{ "⇥", { ".", "l", "w" } },
+		{ "⇤", { ",", "l", "w" } },
+		{ "⤒", { "u", "l", "w" } },
+		{ "⤓", { "d", "l", "w" } },
+		
+		{ "↪︎", { ".", "l", "h" } },
+		{ "↩︎", { ",", "l", "h" } },
+
+		{ "⇒", { ".", "l", "l" } },
+		{ "⇐", { ",", "l", "l" } },
+		{ "⇏", { ".", "l", "l","n" } },
+		{ "⇍", { ",", "l", "l","n" } },
+		{ "⇔", { "s", "l", "l" } },
+		{ "⇑", { "u", "l", "l" } },
+		{ "⇓", { "d", "l", "l" } },
+		{ "⤇", { ".", "l","l", "b" } },
+		{ "⤆", { ",", "l","l", "b" } },
+		{ "⤇", { ".", "l","l", "b" } },
+		{ "⤆", { ",", "l","l", "b" } },
+		{ "⟹", { ".", "l", "l", "g" } },
+		{ "⟸", { ",", "l", "l", "g" } },
+		{ "⟾", { ".", "l","l", "b", "g" } },
+		{ "⟽", { ",", "l","l", "b", "g" } },
+
+		{ "⇛", { ".", "l", "l", "l" } },
+		{ "⇚", { ",", "l", "l", "l" } },
+		{ "⤊", { "u", "l", "l", "l" } },
+		{ "⤋", { "d", "l", "l", "l" } },
+
+		{ "↷", { ".", "l", "hc" } },
+		{ "↶", { ",", "l", "hc" } },
+	}
+	local altClass={{",",".","u","d","s"}}
+	local toggleList={"b","ho","g","hh","hc","w","d"}
+	orderSnip(arr, altClass, toggleList,mathOptShowAuto)
 end
 Arrows()
 
@@ -628,7 +770,6 @@ local function Fraction()
 			end
 		end, {}, {}),
 	}))
-	snip(s({ trig = "div",condition = mathZone }, { t("\\/  ") }))
 end
 Fraction()
 
@@ -636,7 +777,7 @@ Fraction()
 local function Binomial()
 	snip(s({ trig = "bin", hidden = false, condition = mathZone }, { t("binom( "), i(1), t(" ) ") }))
 
-	snip(s({ trig = "bin ([^%s]*) ([^%s]*)%s*", trigEngine = "pattern", hidden = true, condition = mathZone }, {
+	snip(s({ trig = "bin%s+([^%s]+)%s+([^%s]+)%s*", trigEngine = "pattern", hidden = true, condition = mathZone }, {
 		t("binom ( "),
 		f(function(arg, parent, userArg)
 			return parent.captures[1]
@@ -650,107 +791,32 @@ local function Binomial()
 end
 Binomial()
 
---括号
 local function Brackets()
-	asnip(s({ trig = "jj", wordTrig = false, hidden = true, condition = mathZone }, {
-		t("( "),
-		d(1, function(arg, parent, oldState, userArg)
-			if #parent.env.SELECT_RAW > 0 then
-				return sn(nil, { t(parent.env.SELECT_RAW) })
-			else
-				return sn(nil, { i(1) })
-			end
-		end, {}, {}),
-		t(" ) "),
-	}))
-	snip(s({ trig = "kk", wordTrig = false, hidden = true, condition = mathZone }, {
-		t("[ "),
-		d(1, function(arg, parent, oldState, userArg)
-			if #parent.env.SELECT_RAW > 0 then
-				return sn(nil, { t(parent.env.SELECT_RAW) })
-			else
-				return sn(nil, { i(1) })
-			end
-		end, {}, {}),
-		t(" ] "),
-	}))
-	snip(s({ trig = "ll", wordTrig = false, hidden = true, condition = mathZone }, {
-		t("{ "),
-		d(1, function(arg, parent, oldState, userArg)
-			if #parent.env.SELECT_RAW > 0 then
-				return sn(nil, { t(parent.env.SELECT_RAW) })
-			else
-				return sn(nil, { i(1) })
-			end
-		end, {}, {}),
-		t(" } "),
-	}))
-	snip(s({ trig = "bb", hidden = true, condition = mathZone }, {
-		t("⟨ "),
-		d(1, function(arg, parent, oldState, userArg)
-			if #parent.env.SELECT_RAW > 0 then
-				return sn(nil, { t(parent.env.SELECT_RAW) })
-			else
-				return sn(nil, { i(1) })
-			end
-		end, {}, {}),
-		t(" ⟩ "),
-	}))
-	asnip(s({ trig = "kk;", hidden = true, condition = mathZone }, {
-		t("⟦ "),
-		d(1, function(arg, parent, oldState, userArg)
-			if #parent.env.SELECT_RAW > 0 then
-				return sn(nil, { t(parent.env.SELECT_RAW) })
-			else
-				return sn(nil, { i(1) })
-			end
-		end, {}, {}),
-		t(" ⟧ "),
-	}, { condition = mathZone }))
-	asnip(s({ trig = "abs;", hidden = true, condition = mathZone }, {
-		t("abs( "),
-		d(1, function(arg, parent, oldState, userArg)
-			if #parent.env.SELECT_RAW > 0 then
-				return sn(nil, { t(parent.env.SELECT_RAW) })
-			else
-				return sn(nil, { i(1) })
-			end
-		end, {}, {}),
-		t(" ) "),
-	}, { condition = mathZone }))
-	snip(s({ trig = "nrm", hidden = true, condition = mathZone }, {
-		t("‖ "),
-		d(1, function(arg, parent, oldState, userArg)
-			if #parent.env.SELECT_RAW > 0 then
-				return sn(nil, { t(parent.env.SELECT_RAW) })
-			else
-				return sn(nil, { i(1) })
-			end
-		end, {}, {}),
-		t(" ‖ "),
-	}, { condition = mathZone }))
-	snip(s({ trig = "floor", hidden = true, condition = mathZone }, {
-		t("floor( "),
-		d(1, function(arg, parent, oldState, userArg)
-			if #parent.env.SELECT_RAW > 0 then
-				return sn(nil, { t(parent.env.SELECT_RAW) })
-			else
-				return sn(nil, { i(1) })
-			end
-		end, {}, {}),
-		t(" ) "),
-	}, { condition = mathZone }))
-	snip(s({ trig = "ceil", hidden = true, condition = mathZone }, {
-		t("ceil( "),
-		d(1, function(arg, parent, oldState, userArg)
-			if #parent.env.SELECT_RAW > 0 then
-				return sn(nil, { t(parent.env.SELECT_RAW) })
-			else
-				return sn(nil, { i(1) })
-			end
-		end, {}, {}),
-		t(" ) "),
-	}, { condition = mathZone }))
+	local function bracketSnip(opts,left,right)
+		local addSnip = opts.auto and asnip or snip
+		addSnip(s(opts, {
+			t(left),
+			d(1, function(arg, parent, oldState, userArg)
+				if #parent.env.SELECT_RAW > 0 then
+					return sn(nil, { t(parent.env.SELECT_RAW) })
+				else
+					return sn(nil, { i(1) })
+				end
+			end, {}, {}),
+			t(right),
+		}))
+	end
+	bracketSnip({ trig = "jj", auto=true, wordTrig = false, hidden = true, condition = mathZone },"( "," ) ")
+	bracketSnip({ trig = "kkb", auto=true, wordTrig = false, hidden = true, condition = mathZone },"[ "," ] ")
+	bracketSnip({ trig = "llb", auto=true, wordTrig = false, hidden = true, condition = mathZone },"{ "," } ")
+	bracketSnip({ trig = "bb", auto=false, wordTrig = true, hidden = true, condition = mathZone },"⟨ "," ⟩ ")
+	bracketSnip({ trig = "kkc", auto=true, wordTrig = false, hidden = false, condition = mathZone },"⟦ "," ⟧ ")
+	bracketSnip({ trig = "abs", auto=false, wordTrig = false, hidden = false, condition = mathZone },"abs( "," ) ")
+	bracketSnip({ trig = "nrm", auto=false, wordTrig = false, hidden = false, condition = mathZone },"‖ "," ‖ ")
+	bracketSnip({ trig = "floor", auto=false, wordTrig = false, hidden = false, condition = mathZone },"floor( "," ) ")
+	bracketSnip({ trig = "ceil", auto=false, wordTrig = false, hidden = false, condition = mathZone },"ceil( "," ) ")
+	bracketSnip({ trig = "sqr", auto=true, wordTrig = false, hidden = false, condition = mathZone },"sqrt( "," ) ")
+
 end
 Brackets()
 
@@ -758,10 +824,10 @@ Brackets()
 local function Texts()
 	asnip(s({ trig = "s.t.", hidden = true, condition = mathZone }, { t("stW") }))
 	snip(s({ trig = "and", hidden = true, condition = mathZone }, { t("andW") }))
+	snip(s({ trig = "or", hidden = true, condition = mathZone }, { t("orW") }))
 	snip(s({ trig = "ksw", hidden = true, condition = mathZone }, { t("space.en ") }))
 	snip(s({ trig = "iff", hidden = true, condition = mathZone }, { t("iffW ") }))
 	snip(s({ trig = "if", hidden = true, condition = mathZone }, { t("ifW") }))
-	snip(s({ trig = "or", hidden = true, condition = mathZone }, { t("orW") }))
 end
 Texts()
 
@@ -792,30 +858,6 @@ Limits()
 
 --根式
 local function Root()
-	snip(s({ trig = "sqrt", wordTrig = false, hidden = true, condition = mathZone }, {
-		t("sqrt( "),
-		d(1, function(arg, parent, oldState, userArg)
-			if #parent.env.SELECT_RAW > 0 then
-				return sn(nil, { t(parent.env.SELECT_RAW) })
-			else
-				return sn(nil, { i(1) })
-			end
-		end, {}, {}),
-		t(" ) "),
-	}))
-	asnip(
-		s(
-			{ trig = "sqrt;([^%s])", wordTrig = false, hidden = true, trigEngine = "pattern",condition = mathZone },
-			{ 
-                t("sqrt( "), 
-                f(function(arg, parent, userArg)
-                    return parent.captures[1]
-                end, {}),
-                i(1),
-                t(" ) ")
-            }
-        )
-	)
 	snip(s({ trig = "root", wordTrig = false, hidden = false, condition = mathZone }, {
 		t("root( "),
 		i(2),
@@ -881,149 +923,87 @@ UnderOverContent()
 
 --序列
 local function Sequence()
-	snip(s({ trig = "seq (%w[^%s]*)%s+(%w[^%s]*)%s+(%w[^%s]*)", hidden = true, trigEngine = "pattern" }, {
-		f(function(arg, parent, userArg)
-			return parent.captures[1] .. "_( " .. parent.captures[2] .. " ) , " .. parent.captures[1] .. "_( "
-		end, {}),
-		f(function(arg, parent, userArg)
-			if tonumber(parent.captures[2], 10) == nil then
-				return parent.captures[2] .. "+1"
-			end
-			return tostring(parent.captures[2] + 1)
-		end, {}),
-		t(" ) , ⋯ "),
-		f(function(arg, parent, userArg)
-			if parent.captures[3] == "inf" then
-				return ""
-			end
-			return ", " .. parent.captures[1] .. "_( " .. parent.captures[3] .. " ) "
-		end, {}),
-	}, { condition = mathZone }))
-	snip(s({ trig = "seq (%w[^%s]*)%s+(%w[^%s]*)%s+(%w[^%s]*)%s+([^%s]+)", hidden = true, trigEngine = "pattern" }, {
-		f(function(arg, parent, userArg)
-			return parent.captures[1]
-				.. "_( "
-				.. parent.captures[2]
-				.. " ) "
-				.. parent.captures[4]
-				.. " "
-				.. parent.captures[1]
-				.. "_( "
-		end, {}),
-		f(function(arg, parent, userArg)
-			if tonumber(parent.captures[2], 10) == nil then
-				return parent.captures[2] .. "+1"
-			end
-			return tostring(parent.captures[2] + 1)
-		end, {}),
-		f(function(arg, parent, userArg)
-			return " ) " .. parent.captures[4] .. " ⋯ "
-		end, {}),
-		f(function(arg, parent, userArg)
-			if parent.captures[3] == "inf" then
-				return ""
-			end
-			return parent.captures[4] .. " " .. parent.captures[1] .. "_( " .. parent.captures[3] .. " ) "
-		end, {}),
-	}, { condition = mathZone }))
+    local function nextIndex(val)
+        local n = tonumber(val)
+        if n then return tostring(n + 1) end
+        -- 如果是字母或表达式，直接加1
+        return val .. " +1 "
+    end
+
+    local function generateSeq(template, start, stop, op)
+        local separator = op == "" and ", " or (" " .. op .. " ")
+		if not template:find("%%") then
+			template=template.."_( % )"
+		end
+        local first = template:gsub("%%", start)
+        local second = template:gsub("%%", nextIndex(start))
+        local last = ""
+        if stop ~= "inf" then
+            last = separator .. template:gsub("%%", stop)
+        end
+        
+        return first .. separator .. second .. separator .. "⋯ " .. last
+    end
+
+    snip(s({ 
+        trig = "seq%s+([^;]+);([^;]+);([^;]+);?([^;]*)",
+        trigEngine = "pattern", 
+        hidden = true, 
+        condition = mathZone 
+    }, {
+        f(function(_, parent)
+            local caps = parent.captures
+            return generateSeq(caps[1], caps[2], caps[3], caps[4])
+        end)
+    }))
+
 end
+
 Sequence()
 
 --求导
 local function Differential()
-	asnip(s({ trig = "[dp];(%w[^/%s]*)/", hidden = true, trigEngine = "pattern" }, {
-		t("( "),
-		f(function(arg, parent, userArg)
-			if parent.captures[2] == "d" then
-				return "d "
-			else
-				return "∂ "
-			end
-		end, {}),
-		f(function(arg, parent, userArg)
-			return parent.captures[1]
-		end, {}),
-		t(" )/( "),
-		f(function(arg, parent, userArg)
-			if parent.captures[2] == "d" then
-				return "d "
-			else
-				return "∂ "
-			end
-		end, {}),
-		i(1),
-		t(" ) "),
-	}, { condition = mathZone }))
 	asnip(
 		s(
 			{ trig = ";d", hidden = true },
-			{ t("( "), t("d "), i(1), t(" )/( "), t("d "), i(2), t(" )") },
+			{ t("( "), t("upright(d) "), i(1), t(" )/( "), t("upright(d) "), i(2), t(" )") },
 			{ condition = mathZone }
 		)
 	)
 	asnip(
 		s(
-			{ trig = "/p", hidden = true },
+			{ trig = ";p", hidden = true },
 			{ t("( "), t("∂ "), i(1), t(" )/( "), t("∂ "), i(2), t(" )") },
 			{ condition = mathZone }
 		)
 	)
 	asnip(s({ trig = ".p", hidden = true }, { t("∂ _( "), i(1), t(" )") }, { condition = mathZone }))
 	switchSnip({ "∂ _( ", "∂ /( ∂ " })
+	asnip(s({ trig = ".d", hidden = true }, { t("upright(d) _( "), i(1), t(" )") }, { condition = mathZone }))
+	switchSnip({ "upright(d) _( ", "upright(d) /( upright(d) " })
 end
 Differential()
 
 --------------------------------装饰--------------------------------
 --字体
 local function Fonts()
-	asnip(s({ trig = ";b(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone }, {
-		t('mbb("'),
-		f(function(arg, parent, userArg)
-			return parent.captures[1]
-		end, {}),
-		i(1),
-		t('") '),
-	}))
-	asnip(s({ trig = ";f(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone }, {
-		t("frak( "),
-		f(function(arg, parent, userArg)
-			return parent.captures[1]
-		end, {}),
-		i(1),
-		t(" ) "),
-	}))
-	asnip(s({ trig = ";c(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone }, {
-		t("cal( "),
-		f(function(arg, parent, userArg)
-			return parent.captures[1]
-		end, {}),
-		i(1),
-		t(" ) "),
-	}))
-	asnip(s({ trig = ";s(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone }, {
-		t("scr( "),
-		f(function(arg, parent, userArg)
-			return parent.captures[1]
-		end, {}),
-		i(1),
-		t(" ) "),
-	}))
-	asnip(s({ trig = ";v(%w)", wordTrig = false, regTrig = true, hidden = true, condition = mathZone }, {
-		t("ubold( "),
-		f(function(arg, parent, userArg)
-			return parent.captures[1]
-		end, {}),
-		i(1),
-		t(" ) "),
-	}))
-	asnip(s({ trig = ";i(%w)", wordTrig = false, regTrig = true, hidden = true, condition = mathZone }, {
-		t("italic( "),
-		f(function(arg, parent, userArg)
-			return parent.captures[1]
-		end, {}),
-		i(1),
-		t(" ) "),
-	}))
+	local function fontSnip(opts,name)
+		asnip(s(opts, {
+			t(name..'("'),
+			f(function(arg, parent, userArg)
+				return parent.captures[1]
+			end, {}),
+			i(1),
+			t('") '),
+		}))
+	end
+	fontSnip({ trig = ";b(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },"mbb")
+	fontSnip({ trig = ";f(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },"frak")
+	fontSnip({ trig = ";c(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },"cal")
+	fontSnip({ trig = ";s(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },"scr")
+	fontSnip({ trig = ";v(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },"ubold")
+	fontSnip({ trig = ";i(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },"italic")
+	fontSnip({ trig = ";up(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },"upright")
 end
 Fonts()
 
@@ -1098,11 +1078,11 @@ local function Hats()
 	-- ub db 上下大括号
 	-- ud 上点
 	-- uc 上空心圆圈
-	local function addSnip(name, effect, key)
+	local function hatSnip(name, effect, key)
 		if key == nil then
 			key = ";"
 		end
-		snip(s({ trig = name, hidden = true, trigEngine = "pattern", condition = mathZone }, {
+		snip(s({ trig = name, hidden = false, trigEngine = "pattern", condition = mathZone }, {
 			t(effect .. "( "),
 			d(1, function(arg, parent, oldState, userArg)
 				if #parent.env.SELECT_RAW > 0 then
@@ -1113,7 +1093,7 @@ local function Hats()
 			end, {}, {}),
 			t(" ) "),
 		}))
-		asnip(s({ trig = name .. key .. "(%w)", hidden = true, trigEngine = "pattern", condition = mathZone }, {
+		asnip(s({ trig = name .. key .. "(%w)", hidden = false, trigEngine = "pattern", condition = mathZone }, {
 			t(effect .. "( "),
 			f(function(arg, parent, userArg)
 				return parent.captures[1]
@@ -1123,8 +1103,8 @@ local function Hats()
 		}))
 	end
 	local alpha = {
-		{ "u%.", "arrow", "%." },
-		{ "u,", "arrow.l", "," },
+		{ "ua", "arrow", "%." },
+		{ "ua", "arrow.l", "," },
 		{ "uw", "tilde" },
 		{ "uj", "hat" },
 		{ "uk", "caron" },
@@ -1134,8 +1114,8 @@ local function Hats()
 		{ "vv", "ubold" },
 		{ "uc", "circle" },
 	}
-	for k, v in pairs(alpha) do
-		addSnip(v[1], v[2], v[3])
+	for _, v in pairs(alpha) do
+		hatSnip(v[1], v[2], v[3])
 	end
 end
 Hats()

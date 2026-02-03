@@ -14,7 +14,7 @@ local mainConf = {
 	{
 		"rcarriga/nvim-notify",
 		opts = {
-			timeout = 5000,
+			timeout = 7500,
 		},
 	},
 	-- treesitter
@@ -34,11 +34,16 @@ local mainConf = {
 				"rust",
 				"typst",
 			},
+			compilers = {
+				"clang",
+				"gcc",
+				"zig",
+			},
 		},
 	},
 	-- mason
 	{
-		"williamboman/mason.nvim",
+		"mason-org/mason.nvim",
 		lazy = false,
 		opts = {
 			ensure_installed = {
@@ -84,11 +89,48 @@ local mainConf = {
 			require("luasnip.loaders.from_lua").load({ paths = "./lua/config/luasnip/" })
 		end,
 	},
+	-- blink.cmp
+	{
+		'saghen/blink.cmp',
+		lazy = false,
+		opts={
+			snippets = { preset = 'luasnip' },
+			sources = {
+      			default = { 'lsp', 'path', 'snippets', 'buffer' },
+    		},
+			keymap = {
+				preset = 'none',
+				['<CR>'] = { 'accept', 'fallback' },
+				['<Tab>'] = {
+					function(cmp)
+						if require("luasnip").expandable() then
+							cmp.hide()
+							vim.schedule(function()
+								require("luasnip").expand()
+							end)
+							return true
+						end
+						return cmp.select_next()
+					end,
+					'fallback'
+				},
+			},
+			completion = {
+				list = {
+					selection = {
+						preselect = false, 
+						auto_insert = false, 
+					}
+				},
+				ghost_text = { enabled = true },
+  			},
+		},
+	},
 	-- disable friendly-snippets
 	{ "rafamadriz/friendly-snippets", enabled = false },
 	-- mini.pairs
 	{
-		"echasnovski/mini.pairs",
+		"nvim-mini/mini.pairs",
 		opts = {
 			mappings = {
 				["("] = { action = "open", pair = "()", neigh_pattern = "[^\\]." },

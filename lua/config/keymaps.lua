@@ -35,20 +35,20 @@ map(
     }
 )
 
-map(
-    { "i", "n" },
-    "<Tab>",
-    function()
-        if require("luasnip").expandable() then
-            return "<Plug>ls-expand"
-        else
-            return "<Tab>"
-        end
-    end, {
-        silent = true,
-        expr = true,
-    }
-)
+-- map(
+--     { "i", "n" },
+--     "<Tab>",
+--     function()
+--         if require("luasnip").expandable() then
+--             return "<Plug>ls-expand"
+--         else
+--             return "<Tab>"
+--         end
+--     end, {
+--         silent = true,
+--         expr = true,
+--     }
+-- )
 map(
     { "i", "n", "s" },
     "<C-F10>",
