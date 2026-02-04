@@ -2214,7 +2214,7 @@ local function UnicodeSymbols()
 		return results
 	end
 
-	local searchSymbol = s({ trig = "s%s+([%w%s]+)", trigEngine = "pattern" }, {
+	local searchSymbol = s({ trig = "search%s+([%w%s]+)", trigEngine = "pattern" }, {
 		d(1, function(_, parent, _)
 			local searchRst = search(parent.captures[1])
 			return sn(nil, {
