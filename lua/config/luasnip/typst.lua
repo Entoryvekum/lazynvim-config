@@ -473,9 +473,9 @@ local function GreekLetters()
 	}
 
 	for k, v in pairs(arr) do
-		asnip(s({ trig = "\\" .. v[1], condition = mathZone }, { t(v[2][1]) }))
+		asnip(s({ trig = ";" .. v[1], condition = mathZone }, { t(v[2][1]) }))
 		asnip(s({
-			trig = "\\" .. string.upper(string.sub(v[1], 1, 1)) .. string.sub(v[1], 2),
+			trig = ";" .. string.upper(string.sub(v[1], 1, 1)) .. string.sub(v[1], 2),
 			condition = mathZone,
 		}, { t(v[2][#v[2]]) }))
 		switchSnip(v[2], mathOptShow)
@@ -599,7 +599,7 @@ local function Relations()
 	switchSnip({ "⋥", "⋣" }, mathOptShow)
 
 	simpleSnip({
-		{ "sim", "〜" },
+		{ "sim;", "〜" },
 		{ "es;", "⋍" },
 		{ "ee;", "=" },
 		{ "ne;", "≠" },
@@ -607,7 +607,7 @@ local function Relations()
 		{ ":=", "≔" },
 		{ "=def", "≝" },
 		{ "=?", "≟" },
-	}, mathOptShow)
+	}, mathOptShowAuto)
 	orderSnip({
 		{ "=", { "l", "l" } },
 		{ "≠", { "l", "l", "n" } },
@@ -623,7 +623,7 @@ local function Relations()
 	simpleSnip({
 		{ ",e", "≤" },
 		{ ".e", "≥" },
-	}, mathOptShow)
+	}, mathOptShowAuto)
 	orderSnip({
 		{ "<", { "," } },
 		{ ">", { "." } },
@@ -974,14 +974,14 @@ Sequence()
 local function Differential()
 	asnip(
 		s(
-			{ trig = ";d", hidden = true },
+			{ trig = ";df", hidden = true },
 			{ t("( "), t("upright(d) "), i(1), t(" )/( "), t("upright(d) "), i(2), t(" )") },
 			{ condition = mathZone }
 		)
 	)
 	asnip(
 		s(
-			{ trig = ";p", hidden = true },
+			{ trig = ";pt", hidden = true },
 			{ t("( "), t("∂ "), i(1), t(" )/( "), t("∂ "), i(2), t(" )") },
 			{ condition = mathZone }
 		)
@@ -1006,20 +1006,20 @@ local function Fonts()
 			t('") '),
 		}))
 	end
-	fontSnip({ trig = ";b(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone }, "mbb")
-	fontSnip({ trig = ";f(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone }, "frak")
-	fontSnip({ trig = ";c(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone }, "cal")
-	fontSnip({ trig = ";s(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone }, "scr")
+	fontSnip({ trig = "'b(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone }, "mbb")
+	fontSnip({ trig = "'f(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone }, "frak")
+	fontSnip({ trig = "'c(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone }, "cal")
+	fontSnip({ trig = "'s(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone }, "scr")
 	fontSnip(
-		{ trig = ";v(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },
+		{ trig = "'v(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },
 		"ubold"
 	)
 	fontSnip(
-		{ trig = ";i(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },
+		{ trig = "'i(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },
 		"italic"
 	)
 	fontSnip(
-		{ trig = ";up(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },
+		{ trig = "'up(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },
 		"upright"
 	)
 end

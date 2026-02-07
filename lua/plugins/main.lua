@@ -91,17 +91,17 @@ local mainConf = {
 	},
 	-- blink.cmp
 	{
-		'saghen/blink.cmp',
+		"saghen/blink.cmp",
 		lazy = false,
-		opts={
-			snippets = { preset = 'luasnip' },
+		opts = {
+			snippets = { preset = "luasnip" },
 			sources = {
-      			default = { 'lsp', 'path', 'snippets', 'buffer' },
-    		},
+				default = { "lsp", "path", "snippets", "buffer" },
+			},
 			keymap = {
-				preset = 'none',
-				['<CR>'] = { 'accept', 'fallback' },
-				['<Tab>'] = {
+				preset = "none",
+				["<CR>"] = { "accept", "fallback" },
+				["<Tab>"] = {
 					function(cmp)
 						if require("luasnip").expandable() then
 							cmp.hide()
@@ -112,18 +112,18 @@ local mainConf = {
 						end
 						return cmp.select_next()
 					end,
-					'fallback'
+					"fallback",
 				},
 			},
 			completion = {
 				list = {
 					selection = {
-						preselect = false, 
-						auto_insert = false, 
-					}
+						preselect = false,
+						auto_insert = false,
+					},
 				},
 				ghost_text = { enabled = true },
-  			},
+			},
 		},
 	},
 	-- disable friendly-snippets
@@ -185,6 +185,81 @@ local mainConf = {
 			stiffness = 0.8,
 			trailing_stiffness = 0.7,
 			distance_stop_animating = 0.5,
+		},
+	},
+	{
+		"folke/flash.nvim",
+		event = "VeryLazy",
+		vscode = true,
+		opts = {},
+		keys = {
+			{
+				"s",
+				mode = { "n", "x", "o" },
+				function()
+					local dict = require("utils.tiger").tigerDict
+					require("flash").jump({
+						search = {
+							mode = function(str)
+								local tiger_pattern = dict[str:lower()]
+								local literal_pattern = vim.pesc(str)
+								if tiger_pattern then
+									return string.format([[\(%s\|%s\)]], literal_pattern, tiger_pattern)
+								else
+									return literal_pattern
+								end
+							end,
+						},
+					})
+				end,
+				desc = "Flash",
+			},
+			{
+				"S",
+				mode = { "n", "o", "x" },
+				function()
+					require("flash").treesitter()
+				end,
+				desc = "Flash Treesitter",
+			},
+			{
+				"r",
+				mode = "o",
+				function()
+					require("flash").remote()
+				end,
+				desc = "Remote Flash",
+			},
+			{
+				"R",
+				mode = { "o", "x" },
+				function()
+					require("flash").treesitter_search()
+				end,
+				desc = "Treesitter Search",
+			},
+			{
+				"<c-s>",
+				mode = { "c" },
+				function()
+					require("flash").toggle()
+				end,
+				desc = "Toggle Flash Search",
+			},
+			-- Simulate nvim-treesitter incremental selection
+			{
+				"<c-space>",
+				mode = { "n", "o", "x" },
+				function()
+					require("flash").treesitter({
+						actions = {
+							["<c-space>"] = "next",
+							["<BS>"] = "prev",
+						},
+					})
+				end,
+				desc = "Treesitter Incremental Selection",
+			},
 		},
 	},
 }
