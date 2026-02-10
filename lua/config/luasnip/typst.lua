@@ -700,6 +700,8 @@ local function Arrows()
 		{ "↑", { "u", "l" } },
 		{ "↓", { "d", "l" } },
 		{ "↔", { "s", "l" } },
+		{ "⟶", { ".", "l", "g" } },
+		{ "⟵", { ",", "l", "g" } },
 
 		{ "↦", { ".", "l", "b" } },
 		{ "↤", { ",", "l", "b" } },
@@ -799,12 +801,12 @@ local function Brackets()
 		}))
 	end
 	bracketSnip({ trig = "jj", auto = true, wordTrig = false, hidden = true, condition = mathZone }, "( ", " ) ")
-	bracketSnip({ trig = "kkb", auto = true, wordTrig = false, hidden = true, condition = mathZone }, "[ ", " ] ")
-	bracketSnip({ trig = "llb", auto = true, wordTrig = false, hidden = true, condition = mathZone }, "{ ", " } ")
+	bracketSnip({ trig = "kk", auto = true, wordTrig = false, hidden = true, condition = mathZone }, "[ ", " ] ")
+	bracketSnip({ trig = "ll", auto = true, wordTrig = false, hidden = true, condition = mathZone }, "{ ", " } ")
 	bracketSnip({ trig = "bb", auto = false, wordTrig = true, hidden = true, condition = mathZone }, "⟨ ", " ⟩ ")
 	bracketSnip({ trig = "kkc", auto = true, wordTrig = false, hidden = false, condition = mathZone }, "⟦ ", " ⟧ ")
-	bracketSnip({ trig = "abs", auto = false, wordTrig = false, hidden = false, condition = mathZone }, "abs( ", " ) ")
-	bracketSnip({ trig = "nrm", auto = false, wordTrig = false, hidden = false, condition = mathZone }, "‖ ", " ‖ ")
+	bracketSnip({ trig = "abs", auto = true, wordTrig = false, hidden = false, condition = mathZone }, "abs( ", " ) ")
+	bracketSnip({ trig = "nrm", auto = true, wordTrig = false, hidden = false, condition = mathZone }, "norm( ", " ) ")
 	bracketSnip(
 		{ trig = "floor", auto = false, wordTrig = false, hidden = false, condition = mathZone },
 		"floor( ",
