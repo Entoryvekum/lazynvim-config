@@ -387,7 +387,8 @@ local function tests()
 end
 tests()
 
---------------------------------环境--------------------------------
+--------------------------------环境-----------------------------------
+
 --数学环境
 local function MathEnvironment()
 	asnip(s({ trig = ";;", wordTrig = false, condition = plainText }, { t("$"), i(1), t(" $") }))
@@ -753,7 +754,8 @@ end
 Arrows()
 
 --------------------------------输入--------------------------------
---分数
+
+--分式
 local function Fraction()
 	asnip(s({ trig = "//", hidden = true, condition = mathZone }, {
 		d(1, function(arg, parent, oldState, userArg)
@@ -785,6 +787,7 @@ local function Binomial()
 end
 Binomial()
 
+--括号
 local function Brackets()
 	local function bracketSnip(opts, left, right)
 		local addSnip = opts.auto and asnip or snip
@@ -808,7 +811,7 @@ local function Brackets()
 	bracketSnip({ trig = "abs", auto = true, wordTrig = false, hidden = false, condition = mathZone }, "abs( ", " ) ")
 	bracketSnip({ trig = "nrm", auto = true, wordTrig = false, hidden = false, condition = mathZone }, "norm( ", " ) ")
 	bracketSnip(
-		{ trig = "floor", auto = false, wordTrig = false, hidden = false, condition = mathZone },
+		{ trig = "flr", auto = false, wordTrig = false, hidden = false, condition = mathZone },
 		"floor( ",
 		" ) "
 	)
@@ -1008,20 +1011,27 @@ local function Fonts()
 			t('") '),
 		}))
 	end
-	fontSnip({ trig = "'b(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone }, "mbb")
-	fontSnip({ trig = "'f(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone }, "frak")
-	fontSnip({ trig = "'c(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone }, "cal")
-	fontSnip({ trig = "'s(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone }, "scr")
+	fontSnip({ trig = "''bb(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone }, "mbb")
 	fontSnip(
-		{ trig = "'v(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },
+		{ trig = "''fr(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },
+		"frak"
+	)
+	fontSnip({ trig = "''cl(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone }, "cal")
+	fontSnip({ trig = "''sr(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone }, "scr")
+	fontSnip(
+		{ trig = "''ub(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },
 		"ubold"
 	)
 	fontSnip(
-		{ trig = "'i(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },
+		{ trig = "''jx(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },
 		"italic"
 	)
 	fontSnip(
-		{ trig = "'up(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },
+		{ trig = "''fs(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },
+		"upright"
+	)
+	fontSnip(
+		{ trig = "''pc(%w)", wordTrig = false, hidden = true, trigEngine = "pattern", condition = mathZone },
 		"upright"
 	)
 end
@@ -1118,6 +1128,13 @@ local function Hats()
 			f(function(arg, parent, userArg)
 				return parent.captures[1]
 			end, {}),
+			t(" ) "),
+		}))
+		asnip(s({ trig = name .. key .. "%s(%w)", hidden = false, trigEngine = "pattern", condition = mathZone }, {
+			t(effect .. "( "),
+			f(function(arg, parent, userArg)
+				return parent.captures[1]
+			end, {}),
 			i(1),
 			t(" ) "),
 		}))
@@ -1126,8 +1143,8 @@ local function Hats()
 		{ "ua", "arrow", "%." },
 		{ "ua", "arrow.l", "," },
 		{ "uw", "tilde" },
-		{ "uj", "hat" },
-		{ "uk", "caron" },
+		{ "uk", "hat" },
+		{ "uj", "caron" },
 		{ "ud", "dot" },
 		{ "ul", "overline" },
 		{ "dl", "underline" },
@@ -1141,6 +1158,7 @@ end
 Hats()
 
 --------------------------------表--------------------------------
+
 local function Cases()
 	--Cases
 	local generateCases
@@ -1201,7 +1219,9 @@ local function Matrix1()
 end
 Matrix1()
 
--- Unicode符号
+--------------------------------Unicode与反查--------------------------------
+
+--Unicode符号
 local function UnicodeSymbols()
 	-- 本表生成自https://typst.app/docs/reference/symbols/sym/
 	local symbolTable = {

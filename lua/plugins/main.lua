@@ -262,6 +262,27 @@ local mainConf = {
 			},
 		},
 	},
+	{
+		"yetone/avante.nvim",
+		opts = {
+			provider = "openrouter",
+			providers = {
+				openrouter = {
+					__inherited_from = "openai",
+					endpoint = "https://openrouter.ai/api/v1",
+					api_key_name = "OPENROUTER_API_KEY",
+					model = "stepfun/step-3.5-flash:free",
+				},
+			},
+			selection = {
+				enabled = true,
+				hint_display = "delayed",
+			},
+			behaviour = {
+				auto_set_keymaps = false,
+			},
+		},
+	},
 }
 
 return mainConf
